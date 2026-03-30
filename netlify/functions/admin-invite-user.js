@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
+import { seedDefaultTemplates } from '../../supabase/seed/default-templates.js'
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -71,6 +72,16 @@ export const handler = async (event) => {
 
     if (memberError) {
       return { statusCode: 500, body: JSON.stringify({ error: memberError.message }) }
+    }
+
+    // Seed default templates if this company has none yet
+    const { count } = await supabase
+      .from('letter_templates')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', targetCompanyId)
+    if (count === 0) {
+      try { await seedDefaultTemplates(supabase, targetCompanyId) }
+      catch (e) { console.error('Template seed error:', e.message) }
     }
 
     return { statusCode: 200, body: JSON.stringify({ ok: true, userId: invited.user.id }) }
