@@ -1,0 +1,32 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  functions = "netlify/functions"
+
+[dev]
+  command = "vite"
+  port = 8888
+  targetPort = 5173
+  autoLaunch = false
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["html-pdf-node", "puppeteer"]
+
+[functions."albi-sync"]
+  schedule = "0 8 * * *"
+
+[functions."cleanup-pdfs"]
+  schedule = "0 2 * * *"   # 2:00 AM UTC = 6 PM PT
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/:splat"
+  status = 200
+
+# SPA fallback — must come after all API/function routes
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false

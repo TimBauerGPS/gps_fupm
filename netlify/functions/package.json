@@ -1,0 +1,11 @@
+{
+  "name": "fupm-functions",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "html-pdf-node": "^1.0.7",
+    "twilio": "^5.3.0",
+    "resend": "^3.2.0",
+    "jose": "^5.9.3"
+  }
+}
