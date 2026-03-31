@@ -47,6 +47,47 @@ export default function UserSettings({ companyId }) {
 
   return (
     <div>
+      <div className="card" style={{ marginBottom: 20, background: '#f8fafc', border: '1px solid var(--color-border)' }}>
+        <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 12 }}>Role Permissions</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+          {[
+            {
+              role: 'Member',
+              badge: 'badge-pending',
+              perms: [
+                'Send letters, emails, and SMS',
+                'Search jobs and view job details',
+                'View communication history',
+                'View reports',
+                'Update their own name, phone, and email',
+                'Upload CSV and trigger Albi sync',
+              ],
+            },
+            {
+              role: 'Admin',
+              badge: 'badge-success',
+              perms: [
+                'Everything a Member can do',
+                'Manage company branding & logo',
+                'Configure API keys (Twilio, PostGrid, Resend)',
+                'Create and edit letter templates',
+                'Invite and manage team members',
+                'Import jobs via CSV or Albi sync',
+              ],
+            },
+          ].map(({ role, badge, perms }) => (
+            <div key={role} style={{ background: '#fff', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', padding: '12px 14px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                <span className={`badge ${badge}`}>{role}</span>
+              </div>
+              <ul style={{ margin: 0, paddingLeft: '1.2em', fontSize: 13, lineHeight: 1.8, color: 'var(--color-text)' }}>
+                {perms.map(p => <li key={p}>{p}</li>)}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </div>
+
       <div className="card" style={{ marginBottom: 20 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>Invite User</h3>
         <form onSubmit={handleInvite}>

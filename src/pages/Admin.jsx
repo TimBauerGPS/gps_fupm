@@ -3,19 +3,45 @@ import { supabase } from '../lib/supabase.js'
 
 export default function Admin() {
   const [companies, setCompanies] = useState([])
-  const [users, setUsers] = useState([])
-  const [loading, setLoading] = useState(true)
+  const [users, setUsers]         = useState([])
+  const [groups, setGroups]       = useState([])
+  const [loading, setLoading]     = useState(true)
 
-  useEffect(() => {
-    Promise.all([
-      supabase.from('companies').select('*').order('name'),
+  // Group form state
+  const [newGroupName, setNewGroupName]   = useState('')
+  const [creatingGroup, setCreatingGroup] = useState(false)
+
+  useEffect(() => { loadAll() }, [])
+
+  async function loadAll() {
+    const [c, u, g] = await Promise.all([
+      supabase.from('companies').select('*, company_groups(name)').order('name'),
       supabase.from('company_members').select('*, companies(name)').order('display_name'),
-    ]).then(([c, u]) => {
-      setCompanies(c.data || [])
-      setUsers(u.data || [])
-      setLoading(false)
-    })
-  }, [])
+      supabase.from('company_groups').select('*').order('name'),
+    ])
+    setCompanies(c.data || [])
+    setUsers(u.data || [])
+    setGroups(g.data || [])
+    setLoading(false)
+  }
+
+  async function createGroup(e) {
+    e.preventDefault()
+    if (!newGroupName.trim()) return
+    setCreatingGroup(true)
+    await supabase.from('company_groups').insert({ name: newGroupName.trim() })
+    setNewGroupName('')
+    setCreatingGroup(false)
+    loadAll()
+  }
+
+  async function assignGroup(companyId, groupId) {
+    await supabase
+      .from('companies')
+      .update({ group_id: groupId || null })
+      .eq('id', companyId)
+    loadAll()
+  }
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}><div className="spinner" /></div>
 
@@ -25,28 +51,105 @@ export default function Admin() {
         <h1 className="page-title">Super Admin</h1>
       </div>
 
+      {/* Groups */}
+      <div className="card" style={{ marginBottom: 24 }}>
+        <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>Company Groups</h2>
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 14 }}>
+          Companies in the same group share templates. Each group is fully isolated from other groups.
+        </p>
+
+        {groups.length > 0 && (
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13, marginBottom: 16 }}>
+            <thead>
+              <tr style={{ borderBottom: '1px solid var(--color-border)', textAlign: 'left' }}>
+                <th style={{ padding: '6px 10px' }}>Group Name</th>
+                <th style={{ padding: '6px 10px' }}>Companies</th>
+                <th style={{ padding: '6px 10px' }}>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {groups.map(g => {
+                const members = companies.filter(c => c.group_id === g.id)
+                return (
+                  <tr key={g.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                    <td style={{ padding: '8px 10px', fontWeight: 600 }}>{g.name}</td>
+                    <td style={{ padding: '8px 10px', color: 'var(--color-text-muted)' }}>
+                      {members.length === 0
+                        ? <em>None assigned</em>
+                        : members.map(c => c.name).join(', ')}
+                    </td>
+                    <td style={{ padding: '8px 10px', color: 'var(--color-text-muted)' }}>
+                      {new Date(g.created_at).toLocaleDateString()}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        )}
+
+        <form onSubmit={createGroup} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+          <div className="form-group" style={{ flex: 1, marginBottom: 0 }}>
+            <label>New Group Name</label>
+            <input
+              value={newGroupName}
+              onChange={e => setNewGroupName(e.target.value)}
+              placeholder="e.g. Allied Restoration Network"
+              required
+            />
+          </div>
+          <button type="submit" className="btn-primary" disabled={creatingGroup}>
+            {creatingGroup ? 'Creating…' : 'Create Group'}
+          </button>
+        </form>
+      </div>
+
+      {/* Companies */}
       <div className="card" style={{ marginBottom: 24 }}>
         <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>Companies ({companies.length})</h2>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: '1px solid var(--color-border)', textAlign: 'left' }}>
               <th style={{ padding: '6px 10px' }}>Name</th>
-              <th style={{ padding: '6px 10px' }}>ID</th>
+              <th style={{ padding: '6px 10px' }}>Group</th>
+              <th style={{ padding: '6px 10px' }}>Admins</th>
               <th style={{ padding: '6px 10px' }}>Created</th>
             </tr>
           </thead>
           <tbody>
-            {companies.map(c => (
-              <tr key={c.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
-                <td style={{ padding: '8px 10px', fontWeight: 600 }}>{c.name}</td>
-                <td style={{ padding: '8px 10px', color: 'var(--color-text-muted)', fontFamily: 'monospace', fontSize: 11 }}>{c.id}</td>
-                <td style={{ padding: '8px 10px', color: 'var(--color-text-muted)' }}>{new Date(c.created_at).toLocaleDateString()}</td>
-              </tr>
-            ))}
+            {companies.map(c => {
+              const admins = users.filter(u => u.company_id === c.id && u.role === 'admin')
+              return (
+                <tr key={c.id} style={{ borderBottom: '1px solid var(--color-border)' }}>
+                  <td style={{ padding: '8px 10px', fontWeight: 600 }}>{c.name}</td>
+                  <td style={{ padding: '8px 10px' }}>
+                    <select
+                      value={c.group_id || ''}
+                      onChange={e => assignGroup(c.id, e.target.value)}
+                      style={{ fontSize: 12, padding: '4px 8px', borderRadius: 4, border: '1px solid var(--color-border)' }}
+                    >
+                      <option value="">— No group —</option>
+                      {groups.map(g => (
+                        <option key={g.id} value={g.id}>{g.name}</option>
+                      ))}
+                    </select>
+                  </td>
+                  <td style={{ padding: '8px 10px', color: admins.length === 0 ? 'var(--color-danger)' : 'var(--color-text-muted)' }}>
+                    {admins.length === 0
+                      ? '⚠ No admin'
+                      : admins.map(a => a.display_name || '(unnamed)').join(', ')}
+                  </td>
+                  <td style={{ padding: '8px 10px', color: 'var(--color-text-muted)' }}>
+                    {new Date(c.created_at).toLocaleDateString()}
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
 
+      {/* Users */}
       <div className="card">
         <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>All Users ({users.length})</h2>
         <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>

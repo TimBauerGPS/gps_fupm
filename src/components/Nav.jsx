@@ -40,6 +40,9 @@ export default function Nav() {
           Settings
         </NavLink>
         <span className="nav-spacer" />
+        <NavLink to="/profile" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+          My Profile
+        </NavLink>
         <button className="btn-secondary" style={{ fontSize: 13, padding: '5px 12px' }} onClick={handleSignOut}>
           Sign out
         </button>
