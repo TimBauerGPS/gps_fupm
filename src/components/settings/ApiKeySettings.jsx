@@ -29,6 +29,8 @@ const helpBtnStyle = {
   justifyContent: 'center',
 }
 
+const WEBHOOK_URL = 'https://fupm.netlify.app/.netlify/functions/twilio-inbound-sms'
+
 export default function ApiKeySettings({ companyId, onDirtyChange }) {
   const FORM_KEYS = ['twilio_account_sid', 'twilio_auth_token', 'twilio_phone_number', 'postgrid_api_key', 'resend_api_key', 'resend_from_domain', 'albi_bcc_email']
   const [form, setForm] = useState({
@@ -39,6 +41,13 @@ export default function ApiKeySettings({ companyId, onDirtyChange }) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [showTwilioHelp, setShowTwilioHelp] = useState(false)
+  const [webhookCopied, setWebhookCopied] = useState(false)
+
+  function copyWebhook() {
+    navigator.clipboard.writeText(WEBHOOK_URL)
+    setWebhookCopied(true)
+    setTimeout(() => setWebhookCopied(false), 2000)
+  }
   const [showPostGridHelp, setShowPostGridHelp] = useState(false)
   const [showResendHelp, setShowResendHelp] = useState(false)
 
@@ -108,6 +117,43 @@ export default function ApiKeySettings({ companyId, onDirtyChange }) {
           <label>Phone Number</label>
           <input value={form.twilio_phone_number || ''} onChange={e => update('twilio_phone_number', e.target.value)} placeholder="+18885551212" />
         </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20, background: '#f0f9ff', border: '1px solid #bae6fd' }}>
+        <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 8 }}>SMS Inbox — Inbound Webhook</h3>
+        <p style={{ fontSize: 13, color: 'var(--color-text-muted)', marginBottom: 12, lineHeight: 1.6 }}>
+          To receive customer replies in the Inbox, point your Twilio number's incoming message webhook to this URL.
+        </p>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 14 }}>
+          <code style={{
+            flex: 1,
+            background: '#fff',
+            border: '1px solid #bae6fd',
+            borderRadius: 6,
+            padding: '8px 12px',
+            fontSize: 12,
+            wordBreak: 'break-all',
+            color: 'var(--color-text)',
+          }}>
+            {WEBHOOK_URL}
+          </code>
+          <button
+            type="button"
+            className="btn-secondary"
+            style={{ fontSize: 12, padding: '7px 14px', flexShrink: 0 }}
+            onClick={copyWebhook}
+          >
+            {webhookCopied ? '✓ Copied' : 'Copy'}
+          </button>
+        </div>
+        <ol style={{ fontSize: 12, color: 'var(--color-text-muted)', lineHeight: 1.9, paddingLeft: '1.25em', margin: 0 }}>
+          <li>Log in to <strong>console.twilio.com</strong></li>
+          <li>Go to <strong>Phone Numbers → Manage → Active Numbers</strong></li>
+          <li>Click your SMS phone number</li>
+          <li>Under <strong>Messaging Configuration</strong>, find <em>"A message comes in"</em></li>
+          <li>Set the webhook URL to the address above, method <strong>HTTP POST</strong></li>
+          <li>Click <strong>Save configuration</strong></li>
+        </ol>
       </div>
 
       <div className="card" style={{ marginBottom: 20 }}>
