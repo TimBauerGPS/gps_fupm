@@ -9,6 +9,7 @@ import NoAccess from './pages/NoAccess.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import JobDetail from './pages/JobDetail.jsx'
 import History from './pages/History.jsx'
+import Inbox from './pages/Inbox.jsx'
 import Report from './pages/Report.jsx'
 import Settings from './pages/Settings.jsx'
 import Admin from './pages/Admin.jsx'
@@ -43,6 +44,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/jobs/:jobName" element={<JobDetail />} />
+          <Route path="/inbox" element={<Inbox />} />
           <Route path="/history" element={<History />} />
           <Route path="/report" element={<Report />} />
 

@@ -104,19 +104,6 @@ async function fetchSheetRows(sheetId, accessToken) {
       })
     )
 
-    // Debug: log what value the "Link to Project" column resolved to for the first few rows
-    if (result.length > 1) {
-      const headers = result[0]
-      const linkIdx = headers.findIndex(h => h?.toString().trim() === 'Link to Project')
-      console.log('sync-now DEBUG: "Link to Project" column index:', linkIdx)
-      if (linkIdx !== -1) {
-        result.slice(1, 4).forEach((row, i) => {
-          console.log(`sync-now DEBUG: row ${i + 1} raw cell object:`, JSON.stringify(rowData[i + 1]?.values?.[linkIdx]))
-          console.log(`sync-now DEBUG: row ${i + 1} resolved value:`, row[linkIdx])
-        })
-      }
-    }
-
     return result
   }
   throw new Error('Could not read any data from the sheet. Make sure it has data and is shared correctly.')

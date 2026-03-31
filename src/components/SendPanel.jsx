@@ -15,6 +15,7 @@ export default function SendPanel({ job, renderedHtml, template, settings, membe
     `${job.name}: Communication regarding your account with ${settings?.company_name || 'our company'}`
   )
   const [emailBodyText, setEmailBodyText] = useState(() => defaultEmailBody(job, member, settings))
+  const [emailCc, setEmailCc] = useState(member?.rep_email || '')
   const [mailRecipient, setMailRecipient] = useState(() => {
     const parts = (job.customer || '').trim().split(/\s+/)
     return {
@@ -143,7 +144,7 @@ export default function SendPanel({ job, renderedHtml, template, settings, membe
             res = await fetch('/api/send-email', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ emailSubject, emailBodyText, pdfUrl, attachmentUrl: attachment?.url || null, attachmentName: attachment?.name || null, toEmail: job.customer_email, replyTo: member?.rep_email || null, jobName: job.name, companyId: job.company_id }),
+              body: JSON.stringify({ emailSubject, emailBodyText, pdfUrl, attachmentUrl: attachment?.url || null, attachmentName: attachment?.name || null, toEmail: job.customer_email, replyTo: member?.rep_email || null, cc: emailCc, jobName: job.name, companyId: job.company_id }),
             })
           }
           const data = await res.json()
@@ -284,8 +285,10 @@ export default function SendPanel({ job, renderedHtml, template, settings, membe
           <EmailCompose
             subject={emailSubject}
             body={emailBodyText}
+            cc={emailCc}
             onSubjectChange={setEmailSubject}
             onBodyChange={setEmailBodyText}
+            onCcChange={setEmailCc}
           />
         </>
       )}
@@ -324,15 +327,11 @@ function defaultSms(job, member, settings) {
   const name = job.customer?.split(' ')[0] || 'there'
   const rep = member?.display_name || ''
   const company = settings?.company_name || 'our company'
-  const balance = ((job.total_invoice_amount || 0) - (job.total_payment_amount || 0))
-  const formatted = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(balance)
-  return `Hi ${name}, this is ${rep} from ${company}. You have an outstanding balance of ${formatted}. Please see the attached letter for details.`
+  return `Hi ${name}, this is ${rep} from ${company}. We are reaching out regarding your project balance. Please see the attached letter for details.`
 }
 
 function defaultEmailBody(job, member, settings) {
   const name = job.customer || 'Valued Customer'
-  const balance = ((job.total_invoice_amount || 0) - (job.total_payment_amount || 0))
-  const formatted = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' }).format(balance)
   const company = settings?.company_name || 'our company'
 
   const footerLines = [
@@ -343,5 +342,5 @@ function defaultEmailBody(job, member, settings) {
   ].filter(Boolean)
   const footer = footerLines.join('\n')
 
-  return `Hi ${name},\n\nPlease see the attached letter regarding your outstanding balance of ${formatted} with ${company}.\n\nIf you have any questions, please don't hesitate to reach out.\n\nBest regards,\n${footer}`
+  return `Hi ${name},\n\nPlease see the attached letter regarding your project balance with ${company}.\n\nIf you have any questions, please don't hesitate to reach out.\n\nBest regards,\n${footer}`
 }

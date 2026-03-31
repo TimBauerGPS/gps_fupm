@@ -17,7 +17,7 @@ export const handler = async (event) => {
   const { data: { user }, error: authError } = await supabase.auth.getUser(token)
   if (authError || !user) return { statusCode: 401, body: 'Unauthorized' }
 
-  const { emailSubject, emailBodyText, pdfUrl, attachmentUrl, attachmentName, toEmail, replyTo, jobName, companyId } = JSON.parse(event.body)
+  const { emailSubject, emailBodyText, pdfUrl, attachmentUrl, attachmentName, toEmail, replyTo, cc, jobName, companyId } = JSON.parse(event.body)
 
   if (!emailSubject || !toEmail || !companyId) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) }
@@ -61,10 +61,15 @@ export const handler = async (event) => {
     const fromName = settings?.company_name || 'Allied Restoration'
     const bcc = settings?.albi_bcc_email ? [settings.albi_bcc_email] : []
 
+    const ccList = cc
+      ? cc.split(',').map(e => e.trim()).filter(Boolean)
+      : []
+
     const { data, error } = await resend.emails.send({
       from: `${fromName} <noreply@${fromDomain}>`,
       to: [toEmail],
       ...(replyTo ? { reply_to: replyTo } : {}),
+      ...(ccList.length ? { cc: ccList } : {}),
       bcc,
       subject: emailSubject,
       text: emailBodyText || '',

@@ -43,10 +43,11 @@ export default function Report() {
   async function runReport() {
     setLoading(true)
     setError('')
-    const from = new Date(fromDate)
-    from.setHours(0, 0, 0, 0)
-    const to = new Date(toDate)
-    to.setHours(23, 59, 59, 999)
+    // Parse as local time (date-only strings are parsed as UTC by spec, causing off-by-one in US timezones)
+    const [fy, fm, fd] = fromDate.split('-').map(Number)
+    const from = new Date(fy, fm - 1, fd, 0, 0, 0, 0)
+    const [ty, tm, td] = toDate.split('-').map(Number)
+    const to = new Date(ty, tm - 1, td, 23, 59, 59, 999)
     const { data, error: err } = await supabase
       .from('communication_history')
       .select('*')
