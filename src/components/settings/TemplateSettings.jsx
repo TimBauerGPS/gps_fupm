@@ -12,8 +12,7 @@ export default function TemplateSettings({ companyId }) {
   useEffect(() => { loadTemplates() }, [companyId])
 
   async function loadTemplates() {
-    // RLS returns both company-level and group-level templates automatically
-    const { data } = await supabase.from('letter_templates').select('*').order('sort_order')
+    const { data } = await supabase.from('letter_templates').select('*').eq('company_id', companyId).order('sort_order')
     setTemplates(data || [])
   }
 
@@ -117,38 +116,22 @@ export default function TemplateSettings({ companyId }) {
         <button className="btn-primary" onClick={newTemplate}>+ New Template</button>
       </div>
 
-      {templates.map(t => {
-        const isGroupTemplate = !!t.group_id && !t.company_id
-        return (
-          <div key={t.id} className="card" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12, opacity: isGroupTemplate ? 0.85 : 1 }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontWeight: 700, fontSize: 14 }}>{t.name}</div>
-              {t.description && <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{t.description}</div>}
-              <div style={{ display: 'flex', gap: 8, marginTop: 6, flexWrap: 'wrap' }}>
-                {isGroupTemplate && (
-                  <span className="badge" style={{ background: '#e0e7ff', color: '#3730a3', border: '1px solid #c7d2fe' }}>
-                    shared by group
-                  </span>
-                )}
-                {t.requires_attachment && <span className="badge badge-pending">requires attachment</span>}
-                <span className={`badge ${t.is_active ? 'badge-success' : 'badge-error'}`}>{t.is_active ? 'active' : 'inactive'}</span>
-              </div>
+      {templates.map(t => (
+        <div key={t.id} className="card" style={{ marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <div style={{ fontWeight: 700, fontSize: 14 }}>{t.name}</div>
+            {t.description && <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{t.description}</div>}
+            <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
+              {t.requires_attachment && <span className="badge badge-pending">requires attachment</span>}
+              <span className={`badge ${t.is_active ? 'badge-success' : 'badge-error'}`}>{t.is_active ? 'active' : 'inactive'}</span>
             </div>
-            {isGroupTemplate ? (
-              <span style={{ fontSize: 12, color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                Managed by group admin
-              </span>
-            ) : (
-              <>
-                <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => setEditing(t)}>Edit</button>
-                <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => toggleActive(t)}>
-                  {t.is_active ? 'Deactivate' : 'Activate'}
-                </button>
-              </>
-            )}
           </div>
-        )
-      })}
+          <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => setEditing(t)}>Edit</button>
+          <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => toggleActive(t)}>
+            {t.is_active ? 'Deactivate' : 'Activate'}
+          </button>
+        </div>
+      ))}
     </div>
   )
 }
