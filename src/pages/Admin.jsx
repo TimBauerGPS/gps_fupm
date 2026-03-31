@@ -1,27 +1,39 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 
+async function adminFetch(action, payload = {}) {
+  const { data: { session } } = await supabase.auth.getSession()
+  const res = await fetch('/api/admin-data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+    body: JSON.stringify({ action, ...payload }),
+  })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error || `Error ${res.status}`)
+  return data
+}
+
 export default function Admin() {
   const [companies, setCompanies] = useState([])
   const [users, setUsers]         = useState([])
   const [groups, setGroups]       = useState([])
   const [loading, setLoading]     = useState(true)
+  const [error, setError]         = useState('')
 
-  // Group form state
   const [newGroupName, setNewGroupName]   = useState('')
   const [creatingGroup, setCreatingGroup] = useState(false)
 
   useEffect(() => { loadAll() }, [])
 
   async function loadAll() {
-    const [c, u, g] = await Promise.all([
-      supabase.from('companies').select('*, company_groups(name)').order('name'),
-      supabase.from('company_members').select('*, companies(name)').order('display_name'),
-      supabase.from('company_groups').select('*').order('name'),
-    ])
-    setCompanies(c.data || [])
-    setUsers(u.data || [])
-    setGroups(g.data || [])
+    try {
+      const data = await adminFetch('load')
+      setCompanies(data.companies || [])
+      setUsers(data.members || [])
+      setGroups(data.groups || [])
+    } catch (err) {
+      setError(err.message)
+    }
     setLoading(false)
   }
 
@@ -29,18 +41,23 @@ export default function Admin() {
     e.preventDefault()
     if (!newGroupName.trim()) return
     setCreatingGroup(true)
-    await supabase.from('company_groups').insert({ name: newGroupName.trim() })
-    setNewGroupName('')
+    try {
+      await adminFetch('createGroup', { name: newGroupName.trim() })
+      setNewGroupName('')
+      loadAll()
+    } catch (err) {
+      setError(err.message)
+    }
     setCreatingGroup(false)
-    loadAll()
   }
 
   async function assignGroup(companyId, groupId) {
-    await supabase
-      .from('companies')
-      .update({ group_id: groupId || null })
-      .eq('id', companyId)
-    loadAll()
+    try {
+      await adminFetch('assignGroup', { companyId, groupId: groupId || null })
+      loadAll()
+    } catch (err) {
+      setError(err.message)
+    }
   }
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}><div className="spinner" /></div>
@@ -50,6 +67,10 @@ export default function Admin() {
       <div className="page-header">
         <h1 className="page-title">Super Admin</h1>
       </div>
+
+      {error && (
+        <div style={{ color: 'var(--color-danger)', marginBottom: 16, fontSize: 13 }}>{error}</div>
+      )}
 
       {/* Groups */}
       <div className="card" style={{ marginBottom: 24 }}>
