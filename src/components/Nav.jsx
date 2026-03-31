@@ -1,10 +1,19 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { NavLink } from 'react-router-dom'
 import { supabase } from '../lib/supabase.js'
 import posterImg from '../assets/fupm-poster.jpg'
 
 export default function Nav() {
-  const [expanded, setExpanded] = useState(false)
+  const [expanded, setExpanded]       = useState(false)
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!session) return
+      supabase.from('super_admins').select('user_id').eq('user_id', session.user.id).maybeSingle()
+        .then(({ data }) => setIsSuperAdmin(!!data))
+    })
+  }, [])
 
   async function handleSignOut() {
     await supabase.auth.signOut()
@@ -40,6 +49,11 @@ export default function Nav() {
           Settings
         </NavLink>
         <span className="nav-spacer" />
+        {isSuperAdmin && (
+          <NavLink to="/admin" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+            Super Admin
+          </NavLink>
+        )}
         <NavLink to="/profile" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
           My Profile
         </NavLink>
