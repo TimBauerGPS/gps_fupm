@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 
 function formatTime(iso) {
@@ -16,12 +16,30 @@ function formatFullTime(iso) {
 }
 
 export default function Inbox() {
-  const [threads, setThreads] = useState([])
-  const [selected, setSelected] = useState(null)
-  const [loading, setLoading] = useState(true)
+  const [threads, setThreads]     = useState([])
+  const [selected, setSelected]   = useState(null)
+  const [loading, setLoading]     = useState(true)
+  const [member, setMember]       = useState(null)
+  const [companyId, setCompanyId] = useState(null)
+  const [replyText, setReplyText] = useState('')
+  const [sending, setSending]     = useState(false)
+  const [sendError, setSendError] = useState('')
+  const messagesEndRef = useRef(null)
 
   useEffect(() => {
     async function load() {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) { setLoading(false); return }
+
+      const { data: memberData } = await supabase
+        .from('company_members')
+        .select('*')
+        .eq('user_id', session.user.id)
+        .maybeSingle()
+
+      setMember(memberData)
+      setCompanyId(memberData?.company_id || null)
+
       // Fetch inbound replies and outbound SMS in parallel
       const [inboundRes, outboundRes] = await Promise.all([
         supabase
@@ -35,78 +53,95 @@ export default function Inbox() {
           .order('sent_at', { ascending: true }),
       ])
 
-      const inbound  = inboundRes.data  || []
-      const outbound = outboundRes.data || []
+      const builtThreads = buildThreads(inboundRes.data || [], outboundRes.data || [])
 
-      // Only show threads where there's at least one inbound reply
-      const repliedPhones = new Set(inbound.map(m => m.from_phone))
-
-      // Group outbound by phone, filtered to replied-only
-      const threadMap = {}
-      for (const msg of outbound) {
-        const phone = msg.recipient_phone
-        if (!phone || !repliedPhones.has(phone)) continue
-        if (!threadMap[phone]) {
-          threadMap[phone] = {
-            phone,
-            name:     msg.recipient_name,
-            jobName:  msg.job_name,
-            messages: [],
-            lastAt:   msg.sent_at,
-          }
+      // Fetch Albi links for all unique job names
+      const jobNames = [...new Set(builtThreads.map(t => t.jobName).filter(Boolean))]
+      if (jobNames.length > 0) {
+        const { data: jobs } = await supabase
+          .from('albi_jobs')
+          .select('name, link_to_project')
+          .in('name', jobNames)
+        const linkMap = {}
+        for (const j of jobs || []) {
+          if (j.link_to_project?.startsWith('http')) linkMap[j.name] = j.link_to_project
         }
-        threadMap[phone].messages.push({
-          id:        msg.id,
-          direction: 'out',
-          body:      msg.sms_body,
-          at:        msg.sent_at,
-          jobName:   msg.job_name,
-        })
-        if (msg.sent_at > threadMap[phone].lastAt) {
-          threadMap[phone].lastAt  = msg.sent_at
-          threadMap[phone].jobName = msg.job_name
-          threadMap[phone].name    = msg.recipient_name || threadMap[phone].name
-        }
+        builtThreads.forEach(t => { t.albiLink = linkMap[t.jobName] || null })
       }
 
-      // Merge inbound replies into threads
-      for (const msg of inbound) {
-        const phone = msg.from_phone
-        if (!threadMap[phone]) {
-          // Inbound with no known outbound — still show it
-          threadMap[phone] = {
-            phone,
-            name:     phone,
-            jobName:  msg.job_name,
-            messages: [],
-            lastAt:   msg.received_at,
-          }
-        }
-        threadMap[phone].messages.push({
-          id:        msg.id,
-          direction: 'in',
-          body:      msg.body,
-          at:        msg.received_at,
-          jobName:   msg.job_name,
-        })
-        if (msg.received_at > threadMap[phone].lastAt) {
-          threadMap[phone].lastAt  = msg.received_at
-          if (msg.job_name) threadMap[phone].jobName = msg.job_name
-        }
-      }
-
-      // Sort messages within each thread chronologically
-      for (const t of Object.values(threadMap)) {
-        t.messages.sort((a, b) => a.at.localeCompare(b.at))
-      }
-
-      const sorted = Object.values(threadMap).sort((a, b) => b.lastAt.localeCompare(a.lastAt))
-      setThreads(sorted)
-      if (sorted.length > 0) setSelected(sorted[0])
+      setThreads(builtThreads)
+      if (builtThreads.length > 0) setSelected(builtThreads[0])
       setLoading(false)
     }
     load()
   }, [])
+
+  // Scroll to bottom when messages change or thread changes
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [selected?.messages?.length, selected?.phone])
+
+  async function handleReply(e) {
+    e.preventDefault()
+    if (!replyText.trim() || !selected || sending) return
+    setSending(true)
+    setSendError('')
+
+    const { data: { session } } = await supabase.auth.getSession()
+    const token = session?.access_token
+
+    try {
+      const res = await fetch('/api/send-sms', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          smsBody:   replyText.trim(),
+          toPhone:   selected.phone,
+          jobName:   selected.jobName,
+          companyId,
+        }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Send failed')
+
+      // Save to history
+      await fetch('/api/save-history', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({
+          companyId,
+          jobName:        selected.jobName,
+          templateName:   null,
+          sentByName:     member?.display_name,
+          channels:       ['sms'],
+          smsStatus:      'sent',
+          smsBody:        replyText.trim(),
+          recipientName:  selected.name,
+          recipientPhone: selected.phone,
+          twilioMessageSid: data.sid,
+        }),
+      })
+
+      // Optimistically append to thread
+      const newMsg = {
+        id:        `local-${Date.now()}`,
+        direction: 'out',
+        body:      replyText.trim(),
+        at:        new Date().toISOString(),
+        jobName:   selected.jobName,
+      }
+      setSelected(s => ({ ...s, messages: [...s.messages, newMsg], lastAt: newMsg.at }))
+      setThreads(ts => ts.map(t =>
+        t.phone === selected.phone
+          ? { ...t, messages: [...t.messages, newMsg], lastAt: newMsg.at }
+          : t
+      ))
+      setReplyText('')
+    } catch (err) {
+      setSendError(err.message)
+    }
+    setSending(false)
+  }
 
   if (loading) return <div style={{ padding: 40, textAlign: 'center' }}><div className="spinner" /></div>
 
@@ -145,7 +180,7 @@ export default function Inbox() {
           return (
             <button
               key={t.phone}
-              onClick={() => setSelected(t)}
+              onClick={() => { setSelected(t); setReplyText(''); setSendError('') }}
               style={{
                 display: 'block',
                 width: '100%',
@@ -177,7 +212,7 @@ export default function Inbox() {
                 textOverflow: 'ellipsis',
                 maxWidth: 220,
               }}>
-                {lastMsg?.direction === 'in' ? '' : 'You: '}{lastMsg?.body || ''}
+                {lastMsg?.direction === 'out' ? 'You: ' : ''}{lastMsg?.body || ''}
               </div>
             </button>
           )
@@ -193,6 +228,7 @@ export default function Inbox() {
               padding: '12px 20px',
               borderBottom: '1px solid var(--color-border)',
               background: 'var(--color-surface)',
+              flexShrink: 0,
             }}>
               <div style={{ fontWeight: 700, fontSize: 15 }}>{selected.name || selected.phone}</div>
               <div style={{ fontSize: 12, color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', gap: 8, marginTop: 2 }}>
@@ -201,7 +237,9 @@ export default function Inbox() {
                   <>
                     <span>·</span>
                     <a
-                      href={`/jobs/${encodeURIComponent(selected.jobName)}`}
+                      href={selected.albiLink || `/jobs/${encodeURIComponent(selected.jobName)}`}
+                      target={selected.albiLink ? '_blank' : undefined}
+                      rel={selected.albiLink ? 'noopener noreferrer' : undefined}
                       style={{ color: 'var(--color-primary)', fontWeight: 600 }}
                     >
                       {selected.jobName}
@@ -249,6 +287,50 @@ export default function Inbox() {
                   </div>
                 )
               })}
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Reply compose */}
+            <div style={{
+              borderTop: '1px solid var(--color-border)',
+              padding: '12px 16px',
+              background: 'var(--color-surface)',
+              flexShrink: 0,
+            }}>
+              {sendError && (
+                <p style={{ fontSize: 12, color: 'var(--color-danger)', marginBottom: 8 }}>{sendError}</p>
+              )}
+              <form onSubmit={handleReply} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
+                <textarea
+                  value={replyText}
+                  onChange={e => setReplyText(e.target.value)}
+                  onKeyDown={e => {
+                    if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReply(e) }
+                  }}
+                  placeholder="Reply… (Enter to send, Shift+Enter for new line)"
+                  rows={2}
+                  style={{
+                    flex: 1,
+                    resize: 'none',
+                    borderRadius: 20,
+                    padding: '10px 16px',
+                    fontSize: 14,
+                    fontFamily: 'inherit',
+                    border: '1px solid var(--color-border)',
+                    outline: 'none',
+                    lineHeight: 1.4,
+                  }}
+                  disabled={sending}
+                />
+                <button
+                  type="submit"
+                  className="btn-primary"
+                  disabled={!replyText.trim() || sending}
+                  style={{ borderRadius: 20, padding: '10px 20px', fontSize: 14, flexShrink: 0 }}
+                >
+                  {sending ? <span className="spinner" style={{ borderTopColor: '#fff', width: 14, height: 14 }} /> : 'Send'}
+                </button>
+              </form>
             </div>
           </>
         ) : (
@@ -259,4 +341,41 @@ export default function Inbox() {
       </div>
     </div>
   )
+}
+
+function buildThreads(inbound, outbound) {
+  const repliedPhones = new Set(inbound.map(m => m.from_phone))
+  const threadMap = {}
+
+  for (const msg of outbound) {
+    const phone = msg.recipient_phone
+    if (!phone || !repliedPhones.has(phone)) continue
+    if (!threadMap[phone]) {
+      threadMap[phone] = { phone, name: msg.recipient_name, jobName: msg.job_name, messages: [], lastAt: msg.sent_at }
+    }
+    threadMap[phone].messages.push({ id: msg.id, direction: 'out', body: msg.sms_body, at: msg.sent_at, jobName: msg.job_name })
+    if (msg.sent_at > threadMap[phone].lastAt) {
+      threadMap[phone].lastAt  = msg.sent_at
+      threadMap[phone].jobName = msg.job_name
+      threadMap[phone].name    = msg.recipient_name || threadMap[phone].name
+    }
+  }
+
+  for (const msg of inbound) {
+    const phone = msg.from_phone
+    if (!threadMap[phone]) {
+      threadMap[phone] = { phone, name: phone, jobName: msg.job_name, messages: [], lastAt: msg.received_at }
+    }
+    threadMap[phone].messages.push({ id: msg.id, direction: 'in', body: msg.body, at: msg.received_at, jobName: msg.job_name })
+    if (msg.received_at > threadMap[phone].lastAt) {
+      threadMap[phone].lastAt = msg.received_at
+      if (msg.job_name) threadMap[phone].jobName = msg.job_name
+    }
+  }
+
+  for (const t of Object.values(threadMap)) {
+    t.messages.sort((a, b) => a.at.localeCompare(b.at))
+  }
+
+  return Object.values(threadMap).sort((a, b) => b.lastAt.localeCompare(a.lastAt))
 }
