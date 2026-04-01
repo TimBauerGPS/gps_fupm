@@ -39,15 +39,19 @@ export const handler = async (event) => {
 
     const client = twilio(sid, token)
 
-    // Shorten URLs via Rebrandly (non-fatal — falls back to full URL)
-    async function shorten(url) {
+    // Shorten URLs via Rebrandly using allied.pub/JOBNUMBER-MMDDYY
+    async function shorten(url, slug) {
       const apiKey = process.env.REBRANDLY_API_KEY
       if (!apiKey) return url
       try {
         const res = await fetch('https://api.rebrandly.com/v1/links', {
           method: 'POST',
           headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ destination: url }),
+          body: JSON.stringify({
+            destination: url,
+            slashtag: slug,
+            domain: { fullName: 'allied.pub' },
+          }),
         })
         if (!res.ok) return url
         const data = await res.json()
@@ -57,8 +61,12 @@ export const handler = async (event) => {
       }
     }
 
-    const shortPdfUrl = pdfUrl ? await shorten(pdfUrl) : null
-    const shortAttachUrl = attachmentUrl ? await shorten(attachmentUrl) : null
+    const now = new Date()
+    const dateSuffix = `${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getFullYear()).slice(-2)}`
+    const baseSlug = `${jobName}-${dateSuffix}`.replace(/[^a-zA-Z0-9-]/g, '-')
+
+    const shortPdfUrl = pdfUrl ? await shorten(pdfUrl, baseSlug) : null
+    const shortAttachUrl = attachmentUrl ? await shorten(attachmentUrl, `${baseSlug}-attach`) : null
 
     let finalBody = shortPdfUrl ? `${smsBody}\n${shortPdfUrl}` : smsBody
 
