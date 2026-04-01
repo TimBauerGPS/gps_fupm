@@ -63,7 +63,8 @@ export const handler = async (event) => {
 
     const now = new Date()
     const dateSuffix = `${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getFullYear()).slice(-2)}`
-    const baseSlug = `${jobName}-${dateSuffix}`.replace(/[^a-zA-Z0-9-]/g, '-')
+    const randSuffix = Math.random().toString(36).slice(2, 5)
+    const baseSlug = `${jobName}-${dateSuffix}-${randSuffix}`.replace(/[^a-zA-Z0-9-]/g, '-')
 
     const shortPdfUrl = pdfUrl ? await shorten(pdfUrl, baseSlug) : null
     const shortAttachUrl = attachmentUrl ? await shorten(attachmentUrl, `${baseSlug}-attach`) : null
