@@ -28,6 +28,11 @@ export const handler = async (event) => {
   }
 
   try {
+    // Wrap in full HTML document if it's a fragment
+    const fullHtml = renderedHtml.trimStart().startsWith('<!DOCTYPE') || renderedHtml.trimStart().startsWith('<html')
+      ? renderedHtml
+      : `<!DOCTYPE html><html><head><meta charset="utf-8"><style>body{font-family:Arial,sans-serif;font-size:12pt;line-height:1.5;}</style></head><body>${renderedHtml}</body></html>`
+
     // Generate PDF via PDFShift API
     const pdfRes = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
       method: 'POST',
@@ -36,7 +41,7 @@ export const handler = async (event) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        source: renderedHtml,
+        source: fullHtml,
         format: 'Letter',
         margin: { top: '1in', right: '1in', bottom: '1in', left: '1in' },
       }),
