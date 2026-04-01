@@ -121,11 +121,6 @@ export default function UserSettings({ companyId }) {
             <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
               <span className={`badge ${m.role === 'admin' ? 'badge-success' : 'badge-pending'}`}>{m.role}</span>
               <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--color-text-muted)' }}>{m.display_name || m.user_id}</span>
-              {m.role !== 'admin' && (
-                <button className="btn-secondary" style={{ marginLeft: 'auto', fontSize: 12 }} onClick={() => updateMember(m.user_id, { role: 'admin' })}>
-                  Make Admin
-                </button>
-              )}
             </div>
             <div className="form-row">
               <EditField label="Display Name ({{Rep}})" value={m.display_name} onSave={v => updateMember(m.user_id, { display_name: v })} />

@@ -4,14 +4,17 @@ import { supabase } from '../lib/supabase.js'
 import posterImg from '../assets/fupm-poster.jpg'
 
 export default function Nav() {
-  const [expanded, setExpanded]       = useState(false)
+  const [expanded, setExpanded]         = useState(false)
   const [isSuperAdmin, setIsSuperAdmin] = useState(false)
+  const [isAdmin, setIsAdmin]           = useState(false)
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (!session) return
       supabase.from('super_admins').select('user_id').eq('user_id', session.user.id).maybeSingle()
         .then(({ data }) => setIsSuperAdmin(!!data))
+      supabase.from('company_members').select('role').eq('user_id', session.user.id).maybeSingle()
+        .then(({ data }) => setIsAdmin(data?.role === 'admin'))
     })
   }, [])
 
@@ -45,9 +48,11 @@ export default function Nav() {
         <NavLink to="/report" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
           Report
         </NavLink>
-        <NavLink to="/settings" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
-          Settings
-        </NavLink>
+        {isAdmin && (
+          <NavLink to="/settings" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}>
+            Settings
+          </NavLink>
+        )}
         <span className="nav-spacer" />
         {isSuperAdmin && (
           <NavLink to="/admin" className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`} style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>

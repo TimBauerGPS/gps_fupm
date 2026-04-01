@@ -58,6 +58,17 @@ export default function Profile() {
     load()
   }, [])
 
+  function updatePhone(val) {
+    const digits = val.replace(/\D/g, '').slice(0, 10)
+    let formatted = digits
+    if (digits.length > 6) {
+      formatted = `(${digits.slice(0, 3)}) ${digits.slice(3, 6)}-${digits.slice(6)}`
+    } else if (digits.length > 3) {
+      formatted = `(${digits.slice(0, 3)}) ${digits.slice(3)}`
+    }
+    setForm(f => ({ ...f, rep_phone: formatted }))
+  }
+
   async function handleProfileSave(e) {
     e.preventDefault()
     setProfileSaving(true)
@@ -181,7 +192,7 @@ export default function Profile() {
               <label>Phone <code style={{ fontWeight: 400, fontSize: 11 }}>{'{{RepPhone}}'}</code></label>
               <input
                 value={form.rep_phone}
-                onChange={e => setForm(f => ({ ...f, rep_phone: e.target.value }))}
+                onChange={e => updatePhone(e.target.value)}
                 placeholder="(555) 555-5555"
               />
             </div>
