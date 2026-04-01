@@ -39,26 +39,10 @@ export const handler = async (event) => {
 
     const client = twilio(sid, token)
 
-    // Shorten PDF URL via TinyURL (free, no auth required)
-    let shortUrl = pdfUrl
-    if (pdfUrl) {
-      try {
-        const tinyRes = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(pdfUrl)}`)
-        if (tinyRes.ok) shortUrl = (await tinyRes.text()).trim()
-      } catch {
-        // Non-fatal — fall back to full URL
-      }
-    }
-
-    let finalBody = shortUrl ? `${smsBody}\n${shortUrl}` : smsBody
+    let finalBody = pdfUrl ? `${smsBody}\n${pdfUrl}` : smsBody
 
     if (attachmentUrl) {
-      let shortAttachUrl = attachmentUrl
-      try {
-        const tinyRes = await fetch(`https://tinyurl.com/api-create.php?url=${encodeURIComponent(attachmentUrl)}`)
-        if (tinyRes.ok) shortAttachUrl = await tinyRes.text()
-      } catch {}
-      finalBody += `\n\nAttachment: ${shortAttachUrl}`
+      finalBody += `\n\nAttachment: ${attachmentUrl}`
     }
 
     const message = await client.messages.create({
