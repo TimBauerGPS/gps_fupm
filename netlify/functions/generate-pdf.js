@@ -1,6 +1,4 @@
 import { createClient } from '@supabase/supabase-js'
-import chromium from '@sparticuz/chromium'
-import puppeteer from 'puppeteer-core'
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -24,25 +22,33 @@ export const handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) }
   }
 
-  let browser = null
+  const apiKey = process.env.PDFSHIFT_API_KEY
+  if (!apiKey) {
+    return { statusCode: 500, body: JSON.stringify({ error: 'PDF service not configured (PDFSHIFT_API_KEY missing)' }) }
+  }
+
   try {
-    browser = await puppeteer.launch({
-      args: chromium.args,
-      defaultViewport: chromium.defaultViewport,
-      executablePath: await chromium.executablePath(),
-      headless: chromium.headless,
+    // Generate PDF via PDFShift API
+    const pdfRes = await fetch('https://api.pdfshift.io/v3/convert/pdf', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${Buffer.from(`api:${apiKey}`).toString('base64')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        source: renderedHtml,
+        format: 'Letter',
+        margin: { top: '1in', right: '1in', bottom: '1in', left: '1in' },
+        print_background: true,
+      }),
     })
 
-    const page = await browser.newPage()
-    await page.setContent(renderedHtml, { waitUntil: 'networkidle0' })
-    const pdfBuffer = await page.pdf({
-      format: 'Letter',
-      margin: { top: '1in', right: '1in', bottom: '1in', left: '1in' },
-      printBackground: true,
-    })
+    if (!pdfRes.ok) {
+      const errText = await pdfRes.text()
+      throw new Error(`PDFShift error ${pdfRes.status}: ${errText}`)
+    }
 
-    await browser.close()
-    browser = null
+    const pdfBuffer = Buffer.from(await pdfRes.arrayBuffer())
 
     const filename = `${jobName}-${Date.now()}.pdf`
     const storagePath = `${companyId}/${filename}`
@@ -64,7 +70,6 @@ export const handler = async (event) => {
       body: JSON.stringify({ pdfUrl: signedData.signedUrl }),
     }
   } catch (err) {
-    if (browser) await browser.close().catch(() => {})
     console.error('generate-pdf error:', err)
     return { statusCode: 500, body: JSON.stringify({ error: err.message }) }
   }

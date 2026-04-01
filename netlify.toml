@@ -11,7 +11,7 @@
 
 [functions]
   node_bundler = "esbuild"
-  external_node_modules = ["@sparticuz/chromium", "puppeteer-core", "jose", "twilio", "resend"]
+  external_node_modules = ["jose", "twilio", "resend"]
 
 [[plugins]]
   package = "@netlify/plugin-functions-install-core"
