@@ -39,10 +39,31 @@ export const handler = async (event) => {
 
     const client = twilio(sid, token)
 
-    let finalBody = pdfUrl ? `${smsBody}\n${pdfUrl}` : smsBody
+    // Shorten URLs via Rebrandly (non-fatal — falls back to full URL)
+    async function shorten(url) {
+      const apiKey = process.env.REBRANDLY_API_KEY
+      if (!apiKey) return url
+      try {
+        const res = await fetch('https://api.rebrandly.com/v1/links', {
+          method: 'POST',
+          headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ destination: url }),
+        })
+        if (!res.ok) return url
+        const data = await res.json()
+        return `https://${data.shortUrl}` || url
+      } catch {
+        return url
+      }
+    }
 
-    if (attachmentUrl) {
-      finalBody += `\n\nAttachment: ${attachmentUrl}`
+    const shortPdfUrl = pdfUrl ? await shorten(pdfUrl) : null
+    const shortAttachUrl = attachmentUrl ? await shorten(attachmentUrl) : null
+
+    let finalBody = shortPdfUrl ? `${smsBody}\n${shortPdfUrl}` : smsBody
+
+    if (shortAttachUrl) {
+      finalBody += `\n\nAttachment: ${shortAttachUrl}`
     }
 
     const message = await client.messages.create({
