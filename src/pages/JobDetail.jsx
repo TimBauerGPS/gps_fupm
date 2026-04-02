@@ -187,9 +187,13 @@ export default function JobDetail() {
             {preflightWarnings.map(w => (
               <li key={w.field}>
                 {w.field} is missing —{' '}
-                <a href={`/settings?tab=${w.tab}`} style={{ color: '#92400e', fontWeight: 600 }}>
-                  Fix in Settings
-                </a>
+                {w.tab === 'users' ? (
+                  <a href="/profile" style={{ color: '#92400e', fontWeight: 600 }}>Fix in Profile</a>
+                ) : member?.role === 'admin' ? (
+                  <a href={`/settings?tab=${w.tab}`} style={{ color: '#92400e', fontWeight: 600 }}>Fix in Settings</a>
+                ) : (
+                  <span style={{ fontWeight: 600 }}>Contact your admin</span>
+                )}
               </li>
             ))}
           </ul>
