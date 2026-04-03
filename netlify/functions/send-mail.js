@@ -50,7 +50,16 @@ export const handler = async (event) => {
       pdf: pdfUrl,
       addressPlacement: 'insert_blank_page',
       skipVerification: true,
-      ...(attachmentUrl ? { attachedPDF: attachmentUrl } : {}),
+    }
+
+    if (attachmentUrl) {
+      // PostGrid rejects letters that define both `pdf` and `attachedPDF`.
+      // We always send the generated letter PDF here, so extra attachments
+      // must be ignored for mail until we support merging PDFs before upload.
+      console.warn('Ignoring mail attachment because PostGrid does not accept attachedPDF alongside pdf', {
+        jobName,
+        companyId,
+      })
     }
 
     const res = await fetch('https://api.postgrid.com/print-mail/v1/letters', {

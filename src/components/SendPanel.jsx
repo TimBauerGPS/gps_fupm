@@ -228,7 +228,7 @@ export default function SendPanel({ job, renderedHtml, template, settings, membe
                 style={{ width: 'auto', fontSize: 13 }}
               />
               <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-                PDF or Word document, max {MAX_ATTACH_MB}MB. Included with email and mail.
+                PDF or Word document, max {MAX_ATTACH_MB}MB. Included with email. Physical mail sends the generated letter only.
               </p>
               {attachUploading && <div style={{ marginTop: 6, fontSize: 12 }}><span className="spinner" style={{ width: 12, height: 12 }} /> Uploading...</div>}
               {attachError && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--color-danger)' }}>{attachError}</div>}
@@ -236,9 +236,9 @@ export default function SendPanel({ job, renderedHtml, template, settings, membe
           ) : (
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 13 }}>📎 {attachment.name}</span>
-              {!attachment.isPdf && channels.includes('mail') && (
+              {channels.includes('mail') && (
                 <span style={{ fontSize: 11, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 4 }}>
-                  Mail requires PDF — DOCX will be included in email only
+                  Physical mail ignores uploaded attachments; the generated letter will still be sent
                 </span>
               )}
               <button
