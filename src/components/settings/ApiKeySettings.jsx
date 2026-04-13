@@ -32,10 +32,10 @@ const helpBtnStyle = {
 const WEBHOOK_URL = 'https://fupm.netlify.app/.netlify/functions/twilio-inbound-sms'
 
 export default function ApiKeySettings({ companyId, onDirtyChange }) {
-  const FORM_KEYS = ['twilio_account_sid', 'twilio_auth_token', 'twilio_phone_number', 'postgrid_api_key', 'resend_api_key', 'resend_from_domain', 'albi_bcc_email']
+  const FORM_KEYS = ['twilio_account_sid', 'twilio_auth_token', 'twilio_phone_number', 'postgrid_api_key', 'resend_api_key', 'resend_from_domain', 'albi_bcc_email', 'pdfshift_api_key']
   const [form, setForm] = useState({
     twilio_account_sid: '', twilio_auth_token: '', twilio_phone_number: '',
-    postgrid_api_key: '', resend_api_key: '', resend_from_domain: '', albi_bcc_email: '',
+    postgrid_api_key: '', resend_api_key: '', resend_from_domain: '', albi_bcc_email: '', pdfshift_api_key: '',
   })
   const [savedForm, setSavedForm] = useState(null)
   const [saving, setSaving] = useState(false)
@@ -59,7 +59,7 @@ export default function ApiKeySettings({ companyId, onDirtyChange }) {
 
   useEffect(() => {
     supabase.from('company_settings')
-      .select('twilio_account_sid, twilio_auth_token, twilio_phone_number, postgrid_api_key, resend_api_key, resend_from_domain, albi_bcc_email')
+      .select('twilio_account_sid, twilio_auth_token, twilio_phone_number, postgrid_api_key, resend_api_key, resend_from_domain, albi_bcc_email, pdfshift_api_key')
       .eq('company_id', companyId).maybeSingle()
       .then(({ data }) => {
         if (data) {
@@ -175,6 +175,19 @@ export default function ApiKeySettings({ companyId, onDirtyChange }) {
 
       <div className="card" style={{ marginBottom: 20 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center' }}>
+          PDFShift (Letter PDFs)
+        </h3>
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 14 }}>
+          Each company must provide its own PDFShift API key to generate letter PDFs.
+        </p>
+        <div className="form-group">
+          <label>API Key</label>
+          <input type="password" value={form.pdfshift_api_key || ''} onChange={e => update('pdfshift_api_key', e.target.value)} placeholder="sk_..." />
+        </div>
+      </div>
+
+      <div className="card" style={{ marginBottom: 20 }}>
+        <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center' }}>
           Resend (Email)
           <button type="button" style={helpBtnStyle} onClick={() => setShowResendHelp(v => !v)}>?</button>
         </h3>
@@ -199,7 +212,7 @@ export default function ApiKeySettings({ companyId, onDirtyChange }) {
           <label>BCC to Albi Email Address <span style={{ fontWeight: 400, color: 'var(--color-text-muted)' }}>(optional)</span></label>
           <input type="email" value={form.albi_bcc_email || ''} onChange={e => update('albi_bcc_email', e.target.value)} placeholder="jobs@youralbi.com" />
           <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-            Every outbound email will be BCC'd here so Albi receives a copy.
+            Every outbound email will be BCC'd here so Albi receives a copy. The sending rep will also be BCC'd automatically when their rep email is filled in.
           </p>
         </div>
       </div>

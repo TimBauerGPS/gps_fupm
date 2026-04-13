@@ -29,7 +29,7 @@ export const handler = async (event) => {
     // Load company settings for credentials
     const { data: settings } = await supabase
       .from('company_settings')
-      .select('twilio_account_sid, twilio_auth_token, twilio_phone_number')
+      .select('twilio_account_sid, twilio_auth_token, twilio_phone_number, company_name')
       .eq('company_id', companyId)
       .single()
 
@@ -73,6 +73,22 @@ export const handler = async (event) => {
 
     if (shortAttachUrl) {
       finalBody += `\n\nAttachment: ${shortAttachUrl}`
+    }
+
+    const { count: priorSmsCount } = await supabase
+      .from('communication_history')
+      .select('id', { count: 'exact', head: true })
+      .eq('company_id', companyId)
+      .eq('recipient_phone', toPhone)
+      .contains('channels', ['sms'])
+
+    if ((priorSmsCount || 0) === 0) {
+      const disclosure = `This is a message from ${settings?.company_name || 'your contractor'} regarding invoicing for your project. Please send STOP or UNSUBSCRIBE to stop receiving text messages.`
+      await client.messages.create({
+        body: disclosure,
+        from,
+        to: toE164(toPhone),
+      })
     }
 
     const message = await client.messages.create({

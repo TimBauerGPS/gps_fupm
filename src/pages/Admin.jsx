@@ -22,6 +22,7 @@ export default function Admin() {
   // Invite form
   const [inviteEmail, setInviteEmail]       = useState('')
   const [inviteCompany, setInviteCompany]   = useState('')
+  const [newCompanyName, setNewCompanyName] = useState('')
   const [inviteRole, setInviteRole]         = useState('member')
   const [inviting, setInviting]             = useState(false)
   const [inviteResult, setInviteResult]     = useState(null)
@@ -49,15 +50,18 @@ export default function Admin() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
         body: JSON.stringify({
-          email:     inviteEmail,
-          role:      inviteRole,
-          companyId: inviteCompany,
+          email:          inviteEmail,
+          role:           inviteRole,
+          companyId:      inviteCompany === '__new__' ? null : inviteCompany,
+          newCompanyName: inviteCompany === '__new__' ? newCompanyName : '',
         }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Invite failed')
       setInviteResult({ ok: true })
       setInviteEmail('')
+      setInviteCompany('')
+      setNewCompanyName('')
       loadAll()
     } catch (err) {
       setInviteResult({ error: err.message })
@@ -96,11 +100,23 @@ export default function Admin() {
               <label>Company</label>
               <select value={inviteCompany} onChange={e => setInviteCompany(e.target.value)} required>
                 <option value="">Select company…</option>
+                <option value="__new__">+ Add new company…</option>
                 {companies.map(c => (
                   <option key={c.id} value={c.id}>{c.name}</option>
                 ))}
               </select>
             </div>
+            {inviteCompany === '__new__' && (
+              <div className="form-group" style={{ flex: 2 }}>
+                <label>New Company Name</label>
+                <input
+                  value={newCompanyName}
+                  onChange={e => setNewCompanyName(e.target.value)}
+                  placeholder="Company name"
+                  required
+                />
+              </div>
+            )}
             <div className="form-group" style={{ flex: 1 }}>
               <label>Role</label>
               <select value={inviteRole} onChange={e => setInviteRole(e.target.value)}>

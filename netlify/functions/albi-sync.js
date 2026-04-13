@@ -13,7 +13,7 @@ export const handler = async () => {
     // Get all companies with a sheet URL
     const { data: companies, error } = await supabase
       .from('company_settings')
-      .select('company_id, albi_sheet_url')
+      .select('company_id, albi_sheet_url, companies(name)')
       .not('albi_sheet_url', 'is', null)
 
     if (error) throw error
@@ -24,7 +24,8 @@ export const handler = async () => {
 
     const results = []
 
-    for (const { company_id, albi_sheet_url } of companies) {
+    for (const { company_id, albi_sheet_url, companies: company } of companies) {
+      if (company?.name !== 'Allied Restoration Services') continue
       try {
         const sheetId = extractSheetId(albi_sheet_url)
         if (!sheetId) {

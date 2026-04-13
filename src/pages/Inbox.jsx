@@ -1,6 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 
+function draftStorageKey(companyId, phone) {
+  return `fupm:sms-draft:${companyId || 'unknown'}:${phone || 'unknown'}`
+}
+
 function formatTime(iso) {
   const d = new Date(iso)
   const now = new Date()
@@ -76,6 +80,12 @@ export default function Inbox() {
     load()
   }, [])
 
+  useEffect(() => {
+    if (!selected?.phone) return
+    setReplyText(localStorage.getItem(draftStorageKey(companyId, selected.phone)) || '')
+    setSendError('')
+  }, [companyId, selected?.phone])
+
   // Scroll to bottom when messages change or thread changes
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -111,7 +121,7 @@ export default function Inbox() {
         body: JSON.stringify({
           companyId,
           jobName:        selected.jobName,
-          templateName:   null,
+          templateName:   'Inbox reply',
           sentByName:     member?.display_name,
           channels:       ['sms'],
           smsStatus:      'sent',
@@ -136,6 +146,7 @@ export default function Inbox() {
           ? { ...t, messages: [...t.messages, newMsg], lastAt: newMsg.at }
           : t
       ))
+      localStorage.removeItem(draftStorageKey(companyId, selected.phone))
       setReplyText('')
     } catch (err) {
       setSendError(err.message)
@@ -180,7 +191,7 @@ export default function Inbox() {
           return (
             <button
               key={t.phone}
-              onClick={() => { setSelected(t); setReplyText(''); setSendError('') }}
+              onClick={() => { setSelected(t) }}
               style={{
                 display: 'block',
                 width: '100%',
@@ -303,7 +314,13 @@ export default function Inbox() {
               <form onSubmit={handleReply} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
                 <textarea
                   value={replyText}
-                  onChange={e => setReplyText(e.target.value)}
+                  onChange={e => {
+                    const nextValue = e.target.value
+                    setReplyText(nextValue)
+                    if (selected?.phone) {
+                      localStorage.setItem(draftStorageKey(companyId, selected.phone), nextValue)
+                    }
+                  }}
                   onKeyDown={e => {
                     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleReply(e) }
                   }}

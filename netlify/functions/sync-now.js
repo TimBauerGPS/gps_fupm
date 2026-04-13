@@ -15,6 +15,17 @@ export const handler = async (event) => {
     const { companyId } = JSON.parse(event.body || '{}')
     if (!companyId) return { statusCode: 400, body: JSON.stringify({ error: 'companyId required' }) }
 
+    const { data: company, error: companyError } = await supabase
+      .from('companies')
+      .select('name')
+      .eq('id', companyId)
+      .maybeSingle()
+
+    if (companyError) throw companyError
+    if (company?.name !== 'Allied Restoration Services') {
+      return { statusCode: 200, body: JSON.stringify({ error: 'Google Sheets sync is only available for Allied Restoration Services.' }) }
+    }
+
     // Get sheet URL for this company
     const { data: settings, error: settingsError } = await supabase
       .from('company_settings')

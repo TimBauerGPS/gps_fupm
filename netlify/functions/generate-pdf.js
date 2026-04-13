@@ -22,9 +22,19 @@ export const handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) }
   }
 
-  const apiKey = process.env.PDFSHIFT_API_KEY
+  const { data: settings, error: settingsError } = await supabase
+    .from('company_settings')
+    .select('pdfshift_api_key')
+    .eq('company_id', companyId)
+    .maybeSingle()
+
+  if (settingsError) {
+    return { statusCode: 500, body: JSON.stringify({ error: settingsError.message }) }
+  }
+
+  const apiKey = settings?.pdfshift_api_key
   if (!apiKey) {
-    return { statusCode: 500, body: JSON.stringify({ error: 'PDF service not configured (PDFSHIFT_API_KEY missing)' }) }
+    return { statusCode: 500, body: JSON.stringify({ error: 'PDFShift API key not configured for this company' }) }
   }
 
   try {

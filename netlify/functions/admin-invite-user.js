@@ -27,9 +27,32 @@ export const handler = async (event) => {
       return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) }
     }
 
-    const { email, role = 'member', companyId, displayName, repPhone, repEmail } = JSON.parse(event.body)
+    const { email, role = 'member', companyId, newCompanyName, displayName, repPhone, repEmail } = JSON.parse(event.body)
 
-    const targetCompanyId = superAdmin ? companyId : member.company_id
+    let targetCompanyId = superAdmin ? companyId : member.company_id
+
+    if (superAdmin && newCompanyName?.trim()) {
+      const trimmedName = newCompanyName.trim()
+      const { data: company, error: companyError } = await supabase
+        .from('companies')
+        .insert({ name: trimmedName })
+        .select('id')
+        .single()
+
+      if (companyError) {
+        return { statusCode: 500, body: JSON.stringify({ error: companyError.message }) }
+      }
+
+      targetCompanyId = company.id
+
+      const { error: settingsError } = await supabase
+        .from('company_settings')
+        .insert({ company_id: targetCompanyId, company_name: trimmedName })
+
+      if (settingsError) {
+        return { statusCode: 500, body: JSON.stringify({ error: settingsError.message }) }
+      }
+    }
 
     if (!email || !targetCompanyId) {
       return { statusCode: 400, body: JSON.stringify({ error: 'email and companyId are required' }) }

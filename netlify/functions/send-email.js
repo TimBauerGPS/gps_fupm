@@ -24,11 +24,19 @@ export const handler = async (event) => {
   }
 
   try {
-    const { data: settings } = await supabase
-      .from('company_settings')
-      .select('resend_api_key, company_name, resend_from_domain, albi_bcc_email')
-      .eq('company_id', companyId)
-      .single()
+    const [{ data: settings }, { data: member }] = await Promise.all([
+      supabase
+        .from('company_settings')
+        .select('resend_api_key, company_name, resend_from_domain, albi_bcc_email')
+        .eq('company_id', companyId)
+        .single(),
+      supabase
+        .from('company_members')
+        .select('rep_email')
+        .eq('company_id', companyId)
+        .eq('user_id', user.id)
+        .maybeSingle(),
+    ])
 
     const apiKey = settings?.resend_api_key || process.env.RESEND_API_KEY
     const resend = new Resend(apiKey)
@@ -59,7 +67,7 @@ export const handler = async (event) => {
 
     const fromDomain = settings?.resend_from_domain || process.env.RESEND_FROM_DOMAIN || 'alliedrestoration.com'
     const fromName = settings?.company_name || 'Allied Restoration'
-    const bcc = settings?.albi_bcc_email ? [settings.albi_bcc_email] : []
+    const bcc = [...new Set([settings?.albi_bcc_email, member?.rep_email].filter(Boolean))]
 
     const ccList = cc
       ? cc.split(',').map(e => e.trim()).filter(Boolean)

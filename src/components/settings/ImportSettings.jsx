@@ -3,6 +3,7 @@ import { supabase } from '../../lib/supabase.js'
 import { parseAlbiCSV } from '../../lib/albiImport.js'
 
 export default function ImportSettings({ companyId, onDirtyChange }) {
+  const [companyName, setCompanyName] = useState('')
   const [sheetUrl, setSheetUrl] = useState('')
   const [savedSheetUrl, setSavedSheetUrl] = useState('')
   const [lastSynced, setLastSynced] = useState(null)
@@ -24,6 +25,11 @@ export default function ImportSettings({ companyId, onDirtyChange }) {
           setLastSynced(data.albi_last_synced_at)
         }
       })
+  }, [companyId])
+
+  useEffect(() => {
+    supabase.from('companies').select('name').eq('id', companyId).maybeSingle()
+      .then(({ data }) => setCompanyName(data?.name || ''))
   }, [companyId])
 
   useEffect(() => {
@@ -110,79 +116,81 @@ export default function ImportSettings({ companyId, onDirtyChange }) {
 
   return (
     <div>
-      <div className="card" style={{ marginBottom: 20 }}>
-        <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Google Sheets (Nightly Sync)</h3>
-        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 10 }}>
-          The sheet syncs automatically at midnight PT. Share your Albi sheet with the service account below as <strong>Viewer</strong>:
-          <br /><code style={{ fontSize: 12, background: 'var(--color-bg)', padding: '2px 6px', borderRadius: 3 }}>
-            {import.meta.env.VITE_SERVICE_ACCOUNT_EMAIL || 'fupm-sync@your-project.iam.gserviceaccount.com'}
-          </code>
-        </p>
-        <div style={{ background: '#fef9c3', border: '1px solid #fde047', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 14, fontSize: 12, color: '#713f12' }}>
-          <strong>Data access notice:</strong> By connecting a Google Sheet, you grant Allied Restoration Services
-          read access to that sheet via a shared service account. This access is used solely to sync job data
-          into FUPM and is not shared with any third parties.
-        </div>
-        <form onSubmit={saveSheetUrl}>
-          <div className="form-group" style={{ marginBottom: 12 }}>
-            <label>Google Sheet URL</label>
-            <input
-              value={sheetUrl}
-              onChange={e => setSheetUrl(e.target.value)}
-              placeholder="https://docs.google.com/spreadsheets/d/..."
-            />
+      {companyName === 'Allied Restoration Services' && (
+        <div className="card" style={{ marginBottom: 20 }}>
+          <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Google Sheets (Nightly Sync)</h3>
+          <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 10 }}>
+            The sheet syncs automatically at midnight PT. Share your Albi sheet with the service account below as <strong>Viewer</strong>:
+            <br /><code style={{ fontSize: 12, background: 'var(--color-bg)', padding: '2px 6px', borderRadius: 3 }}>
+              {import.meta.env.VITE_SERVICE_ACCOUNT_EMAIL || 'fupm-sync@your-project.iam.gserviceaccount.com'}
+            </code>
+          </p>
+          <div style={{ background: '#fef9c3', border: '1px solid #fde047', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 14, fontSize: 12, color: '#713f12' }}>
+            <strong>Data access notice:</strong> By connecting a Google Sheet, you grant Allied Restoration Services
+            read access to that sheet via a shared service account. This access is used solely to sync job data
+            into FUPM and is not shared with any third parties.
           </div>
-          {lastSynced && (
-            <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 10 }}>
-              Last synced: {new Date(lastSynced).toLocaleString()}
-            </p>
+          <form onSubmit={saveSheetUrl}>
+            <div className="form-group" style={{ marginBottom: 12 }}>
+              <label>Google Sheet URL</label>
+              <input
+                value={sheetUrl}
+                onChange={e => setSheetUrl(e.target.value)}
+                placeholder="https://docs.google.com/spreadsheets/d/..."
+              />
+            </div>
+            {lastSynced && (
+              <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 10 }}>
+                Last synced: {new Date(lastSynced).toLocaleString()}
+              </p>
+            )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+              <button type="submit" className="btn-primary" disabled={saving}>
+                {saving ? 'Saving…' : 'Save Sheet URL'}
+              </button>
+              <button
+                type="button"
+                className="btn-secondary"
+                disabled={!sheetUrl || validating}
+                onClick={testConnection}
+              >
+                {validating ? <><span className="spinner" /> Testing…</> : 'Test Connection'}
+              </button>
+            </div>
+          </form>
+          {validateResult && (
+            <div
+              className={`badge ${validateResult.ok ? 'badge-success' : 'badge-error'}`}
+              style={{ marginTop: 10, padding: '8px 14px', fontSize: 13 }}
+            >
+              {validateResult.ok
+                ? `✓ Sheet is accessible — ready to sync${validateResult.title ? ` (${validateResult.title})` : ''}`
+                : `✗ ${validateResult.error}`}
+            </div>
           )}
-          <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-            <button type="submit" className="btn-primary" disabled={saving}>
-              {saving ? 'Saving…' : 'Save Sheet URL'}
-            </button>
+
+          <hr style={{ margin: '14px 0', border: 'none', borderTop: '1px solid var(--color-border)' }} />
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <button
               type="button"
-              className="btn-secondary"
-              disabled={!sheetUrl || validating}
-              onClick={testConnection}
+              className="btn-primary"
+              disabled={!sheetUrl || syncing}
+              onClick={syncNow}
             >
-              {validating ? <><span className="spinner" /> Testing…</> : 'Test Connection'}
+              {syncing ? <><span className="spinner" style={{ width: 13, height: 13, marginRight: 6 }} />Syncing…</> : '↻ Sync Now'}
             </button>
+            {syncResult && (
+              <span
+                style={{ fontSize: 13, color: syncResult.ok ? 'var(--color-success)' : 'var(--color-danger)' }}
+              >
+                {syncResult.ok
+                  ? `✓ Synced ${syncResult.count} jobs`
+                  : `✗ ${syncResult.error}`}
+              </span>
+            )}
           </div>
-        </form>
-        {validateResult && (
-          <div
-            className={`badge ${validateResult.ok ? 'badge-success' : 'badge-error'}`}
-            style={{ marginTop: 10, padding: '8px 14px', fontSize: 13 }}
-          >
-            {validateResult.ok
-              ? `✓ Sheet is accessible — ready to sync${validateResult.title ? ` (${validateResult.title})` : ''}`
-              : `✗ ${validateResult.error}`}
-          </div>
-        )}
-
-        <hr style={{ margin: '14px 0', border: 'none', borderTop: '1px solid var(--color-border)' }} />
-        <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
-          <button
-            type="button"
-            className="btn-primary"
-            disabled={!sheetUrl || syncing}
-            onClick={syncNow}
-          >
-            {syncing ? <><span className="spinner" style={{ width: 13, height: 13, marginRight: 6 }} />Syncing…</> : '↻ Sync Now'}
-          </button>
-          {syncResult && (
-            <span
-              style={{ fontSize: 13, color: syncResult.ok ? 'var(--color-success)' : 'var(--color-danger)' }}
-            >
-              {syncResult.ok
-                ? `✓ Synced ${syncResult.count} jobs`
-                : `✗ ${syncResult.error}`}
-            </span>
-          )}
         </div>
-      </div>
+      )}
 
       <div className="card">
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 6 }}>Manual CSV Import</h3>
@@ -190,6 +198,9 @@ export default function ImportSettings({ companyId, onDirtyChange }) {
           Export your Albi data as CSV and upload here. Existing jobs will be updated; new jobs will be added.
           The file must have a <strong>Name</strong> column header.
         </p>
+        <div style={{ background: '#f8fafc', border: '1px solid var(--color-border)', borderRadius: 'var(--radius)', padding: '10px 14px', marginBottom: 14, fontSize: 12, color: 'var(--color-text-muted)' }}>
+          The CSV file itself is not uploaded to Storage or saved for later reuse. It is parsed in your browser, and only the resulting job rows are written to your company&apos;s private `albi_jobs` records.
+        </div>
         <input
           ref={fileRef}
           type="file"
