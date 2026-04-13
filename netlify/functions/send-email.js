@@ -17,7 +17,7 @@ export const handler = async (event) => {
   const { data: { user }, error: authError } = await supabase.auth.getUser(token)
   if (authError || !user) return { statusCode: 401, body: 'Unauthorized' }
 
-  const { emailSubject, emailBodyText, pdfUrl, attachmentUrl, attachmentName, toEmail, replyTo, cc, jobName, companyId } = JSON.parse(event.body)
+  const { emailSubject, emailBodyText, pdfUrl, toEmail, replyTo, cc, jobName, companyId } = JSON.parse(event.body)
 
   if (!emailSubject || !toEmail || !companyId) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) }
@@ -47,22 +47,9 @@ export const handler = async (event) => {
       const pdfRes = await fetch(pdfUrl)
       const pdfBuffer = Buffer.from(await pdfRes.arrayBuffer())
       attachments.push({
-        filename: `${jobName}-letter.pdf`,
+        filename: `${jobName}-document.pdf`,
         content: pdfBuffer,
       })
-    }
-
-    if (attachmentUrl) {
-      try {
-        const attachRes = await fetch(attachmentUrl)
-        const attachBuffer = Buffer.from(await attachRes.arrayBuffer())
-        attachments.push({
-          filename: attachmentName || 'attachment',
-          content: attachBuffer,
-        })
-      } catch (err) {
-        console.error('Failed to fetch attachment:', err)
-      }
     }
 
     const fromDomain = settings?.resend_from_domain || process.env.RESEND_FROM_DOMAIN || 'alliedrestoration.com'

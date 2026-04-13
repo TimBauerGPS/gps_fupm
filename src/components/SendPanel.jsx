@@ -106,13 +106,19 @@ export default function SendPanel({ job, renderedHtml, template, settings, membe
     const { data: { session } } = await supabase.auth.getSession()
     const token = session?.access_token
 
-    // Generate PDF once
+    // Generate one final PDF once for all channels
     let pdfUrl = null
     try {
       const pdfRes = await fetch('/api/generate-pdf', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ renderedHtml, jobName: job.name, companyId: job.company_id }),
+        body: JSON.stringify({
+          renderedHtml,
+          jobName: job.name,
+          companyId: job.company_id,
+          attachmentUrl: attachment?.url || null,
+          attachmentType: attachment?.type || null,
+        }),
       })
       const pdfData = await pdfRes.json()
       if (!pdfRes.ok) throw new Error(pdfData.error || 'PDF generation failed')
@@ -132,19 +138,19 @@ export default function SendPanel({ job, renderedHtml, template, settings, membe
             res = await fetch('/api/send-sms', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ smsBody, pdfUrl, toPhone: job.customer_phone_number, attachmentUrl: attachment?.url || null, jobName: job.name, companyId: job.company_id }),
+              body: JSON.stringify({ smsBody, pdfUrl, toPhone: job.customer_phone_number, jobName: job.name, companyId: job.company_id }),
             })
           } else if (ch === 'mail') {
             res = await fetch('/api/send-mail', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ pdfUrl, mailingAddress: mailing, mailRecipient, attachmentUrl: attachment?.isPdf ? attachment.url : null, jobName: job.name, companyId: job.company_id }),
+              body: JSON.stringify({ pdfUrl, mailingAddress: mailing, mailRecipient, jobName: job.name, companyId: job.company_id }),
             })
           } else if (ch === 'email') {
             res = await fetch('/api/send-email', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-              body: JSON.stringify({ emailSubject, emailBodyText, pdfUrl, attachmentUrl: attachment?.url || null, attachmentName: attachment?.name || null, toEmail: job.customer_email, replyTo: member?.rep_email || null, cc: emailCc, jobName: job.name, companyId: job.company_id }),
+              body: JSON.stringify({ emailSubject, emailBodyText, pdfUrl, toEmail: job.customer_email, replyTo: member?.rep_email || null, cc: emailCc, jobName: job.name, companyId: job.company_id }),
             })
           }
           const data = await res.json()
@@ -228,7 +234,7 @@ export default function SendPanel({ job, renderedHtml, template, settings, membe
                 style={{ width: 'auto', fontSize: 13 }}
               />
               <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-                PDF or Word document, max {MAX_ATTACH_MB}MB. Included with email. Physical mail sends the generated letter only.
+                PDF or Word document, max {MAX_ATTACH_MB}MB. It will be combined with the generated letter into one final PDF for email, SMS, and physical mail.
               </p>
               {attachUploading && <div style={{ marginTop: 6, fontSize: 12 }}><span className="spinner" style={{ width: 12, height: 12 }} /> Uploading...</div>}
               {attachError && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--color-danger)' }}>{attachError}</div>}
@@ -237,8 +243,8 @@ export default function SendPanel({ job, renderedHtml, template, settings, membe
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: 13 }}>📎 {attachment.name}</span>
               {channels.includes('mail') && (
-                <span style={{ fontSize: 11, color: '#92400e', background: '#fef3c7', padding: '2px 8px', borderRadius: 4 }}>
-                  Physical mail ignores uploaded attachments; the generated letter will still be sent
+                <span style={{ fontSize: 11, color: '#166534', background: '#dcfce7', padding: '2px 8px', borderRadius: 4 }}>
+                  This attachment will be merged into the final PDF sent across all selected channels
                 </span>
               )}
               <button

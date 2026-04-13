@@ -19,7 +19,7 @@ export const handler = async (event) => {
   const { data: { user }, error: authError } = await supabase.auth.getUser(token)
   if (authError || !user) return { statusCode: 401, body: 'Unauthorized' }
 
-  const { smsBody, pdfUrl, toPhone, attachmentUrl, jobName, companyId } = JSON.parse(event.body)
+  const { smsBody, pdfUrl, toPhone, jobName, companyId } = JSON.parse(event.body)
 
   if (!smsBody || !toPhone || !companyId) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) }
@@ -67,13 +67,7 @@ export const handler = async (event) => {
     const baseSlug = `${jobName}-${dateSuffix}-${randSuffix}`.replace(/[^a-zA-Z0-9-]/g, '-')
 
     const shortPdfUrl = pdfUrl ? await shorten(pdfUrl, baseSlug) : null
-    const shortAttachUrl = attachmentUrl ? await shorten(attachmentUrl, `${baseSlug}-attach`) : null
-
-    let finalBody = shortPdfUrl ? `${smsBody}\n${shortPdfUrl}` : smsBody
-
-    if (shortAttachUrl) {
-      finalBody += `\n\nAttachment: ${shortAttachUrl}`
-    }
+    const finalBody = shortPdfUrl ? `${smsBody}\n${shortPdfUrl}` : smsBody
 
     const { count: priorSmsCount } = await supabase
       .from('communication_history')
