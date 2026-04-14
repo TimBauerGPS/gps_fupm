@@ -27,6 +27,11 @@
   to = "/.netlify/functions/:splat"
   status = 200
 
+[[redirects]]
+  from = "/s/:slug"
+  to = "/.netlify/functions/short-link?slug=:slug"
+  status = 200
+
 # SPA fallback — must come after all API/function routes
 [[redirects]]
   from = "/*"

@@ -39,32 +39,32 @@ export const handler = async (event) => {
 
     const client = twilio(sid, token)
 
-    // Shorten URLs via Rebrandly using allied.pub/JOBNUMBER-MMDDYY
-    async function shorten(url, slug) {
-      const apiKey = process.env.REBRANDLY_API_KEY
-      if (!apiKey) return url
-      try {
-        const res = await fetch('https://api.rebrandly.com/v1/links', {
-          method: 'POST',
-          headers: { 'apikey': apiKey, 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            destination: url,
-            slashtag: slug,
-            domain: { fullName: 'allied.pub' },
-          }),
-        })
-        if (!res.ok) return url
-        const data = await res.json()
-        return `https://${data.shortUrl}` || url
-      } catch {
-        return url
+    async function shorten(url, slugBase) {
+      if (!url) return url
+      const baseUrl = (process.env.SHORTENER_BASE_URL || 'https://restopay.xyz').replace(/\/+$/, '')
+
+      for (let i = 0; i < 5; i += 1) {
+        const suffix = Math.random().toString(36).slice(2, 5)
+        const slug = i === 0 ? slugBase : `${slugBase}-${suffix}`
+        const { error } = await supabase
+          .from('short_links')
+          .insert({
+            company_id: companyId,
+            slug,
+            destination_url: url,
+          })
+
+        if (!error) return `${baseUrl}/s/${slug}`
+        if (error.code !== '23505') break
       }
+
+      return url
     }
 
     const now = new Date()
     const dateSuffix = `${String(now.getMonth() + 1).padStart(2, '0')}${String(now.getDate()).padStart(2, '0')}${String(now.getFullYear()).slice(-2)}`
     const randSuffix = Math.random().toString(36).slice(2, 5)
-    const baseSlug = `${jobName}-${dateSuffix}-${randSuffix}`.replace(/[^a-zA-Z0-9-]/g, '-')
+    const baseSlug = `${jobName}-${dateSuffix}-${randSuffix}`.replace(/[^a-zA-Z0-9-]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
 
     const shortPdfUrl = pdfUrl ? await shorten(pdfUrl, baseSlug) : null
     const finalBody = shortPdfUrl ? `${smsBody}\n${shortPdfUrl}` : smsBody

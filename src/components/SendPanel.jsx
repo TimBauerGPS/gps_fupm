@@ -24,7 +24,7 @@ export default function SendPanel({ job, renderedHtml, template, settings, membe
       lastName:    parts.length > 1 ? parts[parts.length - 1] : '',
     }
   })
-  const [attachment, setAttachment] = useState(null)
+  const [attachments, setAttachments] = useState([])
   const [attachError, setAttachError] = useState('')
   const [attachUploading, setAttachUploading] = useState(false)
   const [sending, setSending] = useState(false)
@@ -44,43 +44,51 @@ export default function SendPanel({ job, renderedHtml, template, settings, membe
 
   const MAX_ATTACH_MB = 5
   const MAX_ATTACH_BYTES = MAX_ATTACH_MB * 1024 * 1024
+  const MAX_ATTACH_COUNT = 5
   const ALLOWED_TYPES = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document']
 
   async function handleAttach(e) {
-    const file = e.target.files[0]
-    if (!file) return
+    const files = Array.from(e.target.files || [])
+    if (files.length === 0) return
     setAttachError('')
 
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      setAttachError('Only PDF and DOCX files are allowed.')
-      return
-    }
-    if (file.size > MAX_ATTACH_BYTES) {
-      setAttachError(`File is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max is ${MAX_ATTACH_MB}MB.`)
+    if (attachments.length + files.length > MAX_ATTACH_COUNT) {
+      setAttachError(`You can attach up to ${MAX_ATTACH_COUNT} files.`)
       return
     }
 
     setAttachUploading(true)
     try {
-      const storagePath = `${job.company_id}/attachments/${Date.now()}-${file.name}`
+      const uploaded = []
 
-      const { data, error } = await supabase.storage
-        .from('generated-letters')
-        .upload(storagePath, file, { contentType: file.type })
-      if (error) throw new Error(error.message)
+      for (const file of files) {
+        if (!ALLOWED_TYPES.includes(file.type)) {
+          throw new Error(`"${file.name}" is not supported. Only PDF and DOCX files are allowed.`)
+        }
+        if (file.size > MAX_ATTACH_BYTES) {
+          throw new Error(`"${file.name}" is too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Max is ${MAX_ATTACH_MB}MB.`)
+        }
 
-      const { data: signedData, error: signedError } = await supabase.storage
-        .from('generated-letters')
-        .createSignedUrl(data.path, 60 * 60 * 24 * 7)
-      if (signedError) throw new Error(signedError.message)
+        const storagePath = `${job.company_id}/attachments/${Date.now()}-${file.name}`
 
-      setAttachment({
-        file,
-        name: file.name,
-        type: file.type,
-        url: signedData.signedUrl,
-        isPdf: file.type === 'application/pdf',
-      })
+        const { data, error } = await supabase.storage
+          .from('generated-letters')
+          .upload(storagePath, file, { contentType: file.type })
+        if (error) throw new Error(error.message)
+
+        const { data: signedData, error: signedError } = await supabase.storage
+          .from('generated-letters')
+          .createSignedUrl(data.path, 60 * 60 * 24 * 7)
+        if (signedError) throw new Error(signedError.message)
+
+        uploaded.push({
+          name: file.name,
+          type: file.type,
+          url: signedData.signedUrl,
+        })
+      }
+
+      setAttachments(current => [...current, ...uploaded])
     } catch (err) {
       setAttachError(`Upload failed: ${err.message}`)
     }
@@ -88,8 +96,8 @@ export default function SendPanel({ job, renderedHtml, template, settings, membe
     e.target.value = ''
   }
 
-  function removeAttachment() {
-    setAttachment(null)
+  function removeAttachment(index) {
+    setAttachments(current => current.filter((_, i) => i !== index))
     setAttachError('')
   }
 
@@ -116,8 +124,7 @@ export default function SendPanel({ job, renderedHtml, template, settings, membe
           renderedHtml,
           jobName: job.name,
           companyId: job.company_id,
-          attachmentUrl: attachment?.url || null,
-          attachmentType: attachment?.type || null,
+          attachments,
         }),
       })
       const pdfData = await pdfRes.json()
@@ -224,36 +231,57 @@ export default function SendPanel({ job, renderedHtml, template, settings, membe
       {channels.length > 0 && (
         <div className="card" style={{ marginTop: 12, background: '#f8fafc', border: '1px solid var(--color-border)' }}>
           <h3 style={{ fontSize: 13, fontWeight: 700, marginBottom: 8 }}>Attachment <span style={{ fontWeight: 400, color: 'var(--color-text-muted)' }}>(optional)</span></h3>
-          {!attachment ? (
+          {attachments.length === 0 ? (
             <div>
               <input
                 type="file"
                 accept=".pdf,.docx"
+                multiple
                 onChange={handleAttach}
                 disabled={attachUploading}
                 style={{ width: 'auto', fontSize: 13 }}
               />
               <p style={{ fontSize: 11, color: 'var(--color-text-muted)', marginTop: 4 }}>
-                PDF or Word document, max {MAX_ATTACH_MB}MB. It will be combined with the generated letter into one final PDF for email, SMS, and physical mail.
+                Up to {MAX_ATTACH_COUNT} PDF or Word documents, max {MAX_ATTACH_MB}MB each. They will be combined with the generated letter into one final PDF for email, SMS, and physical mail.
               </p>
               {attachUploading && <div style={{ marginTop: 6, fontSize: 12 }}><span className="spinner" style={{ width: 12, height: 12 }} /> Uploading...</div>}
               {attachError && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--color-danger)' }}>{attachError}</div>}
             </div>
           ) : (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-              <span style={{ fontSize: 13 }}>📎 {attachment.name}</span>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10, flexWrap: 'wrap' }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{attachments.length} attachment{attachments.length === 1 ? '' : 's'} ready</span>
+                <input
+                  type="file"
+                  accept=".pdf,.docx"
+                  multiple
+                  onChange={handleAttach}
+                  disabled={attachUploading || attachments.length >= MAX_ATTACH_COUNT}
+                  style={{ width: 'auto', fontSize: 12 }}
+                />
+              </div>
+              <div style={{ display: 'grid', gap: 8 }}>
+                {attachments.map((attachment, index) => (
+                  <div key={`${attachment.name}-${index}`} style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+                    <span style={{ fontSize: 13 }}>📎 {attachment.name}</span>
+                    <span style={{ fontSize: 11, color: 'var(--color-text-muted)' }}>{attachment.type === 'application/pdf' ? 'PDF' : 'DOCX'}</span>
+                    <button
+                      type="button"
+                      style={{ fontSize: 11, padding: '2px 8px', background: 'none', border: '1px solid var(--color-border)', borderRadius: 4, cursor: 'pointer', color: 'var(--color-danger)' }}
+                      onClick={() => removeAttachment(index)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))}
+              </div>
               {channels.includes('mail') && (
-                <span style={{ fontSize: 11, color: '#166534', background: '#dcfce7', padding: '2px 8px', borderRadius: 4 }}>
-                  This attachment will be merged into the final PDF sent across all selected channels
-                </span>
+                <div style={{ fontSize: 11, color: '#166534', background: '#dcfce7', padding: '6px 10px', borderRadius: 4, marginTop: 10 }}>
+                  These attachments will be merged into the final PDF sent across all selected channels.
+                </div>
               )}
-              <button
-                type="button"
-                style={{ fontSize: 11, padding: '2px 8px', background: 'none', border: '1px solid var(--color-border)', borderRadius: 4, cursor: 'pointer', color: 'var(--color-danger)' }}
-                onClick={removeAttachment}
-              >
-                Remove
-              </button>
+              {attachUploading && <div style={{ marginTop: 6, fontSize: 12 }}><span className="spinner" style={{ width: 12, height: 12 }} /> Uploading...</div>}
+              {attachError && <div style={{ marginTop: 6, fontSize: 12, color: 'var(--color-danger)' }}>{attachError}</div>}
             </div>
           )}
         </div>

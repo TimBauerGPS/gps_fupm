@@ -18,7 +18,7 @@ export const handler = async (event) => {
   const { data: { user }, error: authError } = await supabase.auth.getUser(token)
   if (authError || !user) return { statusCode: 401, body: 'Unauthorized' }
 
-  const { renderedHtml, jobName, companyId, attachmentUrl, attachmentType } = JSON.parse(event.body)
+  const { renderedHtml, jobName, companyId, attachments = [] } = JSON.parse(event.body)
 
   if (!renderedHtml || !jobName || !companyId) {
     return { statusCode: 400, body: JSON.stringify({ error: 'Missing required fields' }) }
@@ -41,23 +41,15 @@ export const handler = async (event) => {
 
   try {
     const letterPdfBuffer = await convertHtmlToPdf(renderedHtml, apiKey)
-    let finalPdfBuffer = letterPdfBuffer
+    const attachmentPdfBuffers = []
 
-    if (attachmentUrl) {
-      const attachmentRes = await fetch(attachmentUrl)
-      if (!attachmentRes.ok) throw new Error(`Attachment fetch failed: ${attachmentRes.status}`)
-      const attachmentBuffer = Buffer.from(await attachmentRes.arrayBuffer())
-
-      if (attachmentType === 'application/pdf') {
-        finalPdfBuffer = await mergePdfBuffers([letterPdfBuffer, attachmentBuffer])
-      } else if (attachmentType === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
-        const { value: attachmentHtml } = await mammoth.convertToHtml({ buffer: attachmentBuffer })
-        const attachmentPdfBuffer = await convertHtmlToPdf(attachmentHtml, apiKey)
-        finalPdfBuffer = await mergePdfBuffers([letterPdfBuffer, attachmentPdfBuffer])
-      } else {
-        throw new Error('Unsupported attachment type')
-      }
+    for (const attachment of attachments) {
+      attachmentPdfBuffers.push(await convertAttachmentToPdf(attachment, apiKey))
     }
+
+    const finalPdfBuffer = attachmentPdfBuffers.length > 0
+      ? await mergePdfBuffers([letterPdfBuffer, ...attachmentPdfBuffers])
+      : letterPdfBuffer
 
     const filename = `${jobName}-${Date.now()}.pdf`
     const storagePath = `${companyId}/${filename}`
@@ -120,4 +112,26 @@ async function mergePdfBuffers(buffers) {
   }
 
   return Buffer.from(await merged.save())
+}
+
+async function convertAttachmentToPdf(attachment, apiKey) {
+  if (!attachment?.url || !attachment?.type) {
+    throw new Error('Attachment metadata is incomplete')
+  }
+
+  const attachmentRes = await fetch(attachment.url)
+  if (!attachmentRes.ok) throw new Error(`Attachment fetch failed: ${attachmentRes.status}`)
+
+  const attachmentBuffer = Buffer.from(await attachmentRes.arrayBuffer())
+
+  if (attachment.type === 'application/pdf') {
+    return attachmentBuffer
+  }
+
+  if (attachment.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') {
+    const { value: attachmentHtml } = await mammoth.convertToHtml({ buffer: attachmentBuffer })
+    return convertHtmlToPdf(attachmentHtml, apiKey)
+  }
+
+  throw new Error(`Unsupported attachment type: ${attachment.type}`)
 }
