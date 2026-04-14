@@ -94,6 +94,10 @@ export default function Inbox() {
   async function handleReply(e) {
     e.preventDefault()
     if (!replyText.trim() || !selected || sending) return
+    if (!selected.jobName) {
+      setSendError('This conversation is missing a job number, so the reply cannot be saved to inbox history yet.')
+      return
+    }
     setSending(true)
     setSendError('')
 
@@ -115,7 +119,7 @@ export default function Inbox() {
       if (!res.ok) throw new Error(data.error || 'Send failed')
 
       // Save to history
-      await fetch('/api/save-history', {
+      const historyRes = await fetch('/api/save-history', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({
@@ -131,6 +135,11 @@ export default function Inbox() {
           twilioMessageSid: data.sid,
         }),
       })
+
+      const historyData = await historyRes.json()
+      if (!historyRes.ok) {
+        throw new Error(historyData.error || 'Message sent, but saving to inbox history failed')
+      }
 
       // Optimistically append to thread
       const newMsg = {
@@ -311,6 +320,11 @@ export default function Inbox() {
               {sendError && (
                 <p style={{ fontSize: 12, color: 'var(--color-danger)', marginBottom: 8 }}>{sendError}</p>
               )}
+              {!selected.jobName && (
+                <p style={{ fontSize: 12, color: '#92400e', marginBottom: 8 }}>
+                  This conversation does not have a linked job number yet. Replies are disabled until the thread can be tied back to a job.
+                </p>
+              )}
               <form onSubmit={handleReply} style={{ display: 'flex', gap: 8, alignItems: 'flex-end' }}>
                 <textarea
                   value={replyText}
@@ -337,12 +351,12 @@ export default function Inbox() {
                     outline: 'none',
                     lineHeight: 1.4,
                   }}
-                  disabled={sending}
+                  disabled={sending || !selected.jobName}
                 />
                 <button
                   type="submit"
                   className="btn-primary"
-                  disabled={!replyText.trim() || sending}
+                  disabled={!replyText.trim() || sending || !selected.jobName}
                   style={{ borderRadius: 20, padding: '10px 20px', fontSize: 14, flexShrink: 0 }}
                 >
                   {sending ? <span className="spinner" style={{ borderTopColor: '#fff', width: 14, height: 14 }} /> : 'Send'}

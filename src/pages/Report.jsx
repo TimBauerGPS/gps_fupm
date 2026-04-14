@@ -51,6 +51,7 @@ export default function Report() {
     const { data, error: err } = await supabase
       .from('communication_history')
       .select('*')
+      .neq('template_name', 'Inbox reply')
       .gte('sent_at', from.toISOString())
       .lte('sent_at', to.toISOString())
       .order('sent_at', { ascending: false })
