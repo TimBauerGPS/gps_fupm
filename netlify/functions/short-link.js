@@ -7,6 +7,8 @@ const supabase = createClient(
 
 export const handler = async (event) => {
   const slug = event.queryStringParameters?.slug
+    || event.path?.split('/s/')[1]?.split('/')[0]
+    || event.rawUrl?.split('/s/')[1]?.split(/[/?#]/)[0]
 
   if (!slug) {
     return { statusCode: 400, body: 'Missing slug' }
