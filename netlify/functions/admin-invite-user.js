@@ -30,6 +30,7 @@ export const handler = async (event) => {
     const { email, role = 'member', companyId, newCompanyName, displayName, repPhone, repEmail } = JSON.parse(event.body)
 
     let targetCompanyId = superAdmin ? companyId : member.company_id
+    let targetCompanyName = null
 
     if (superAdmin && newCompanyName?.trim()) {
       const trimmedName = newCompanyName.trim()
@@ -44,6 +45,7 @@ export const handler = async (event) => {
       }
 
       targetCompanyId = company.id
+      targetCompanyName = trimmedName
 
       const { error: settingsError } = await supabase
         .from('company_settings')
@@ -58,6 +60,15 @@ export const handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'email and companyId are required' }) }
     }
 
+    if (!targetCompanyName) {
+      const { data: company } = await supabase
+        .from('companies')
+        .select('name')
+        .eq('id', targetCompanyId)
+        .maybeSingle()
+      targetCompanyName = company?.name || null
+    }
+
     // Don't pass signup_app metadata — the DB trigger on auth.users
     // causes "database error saving new user". We handle user_app_access
     // and company_members manually below with the service role client.
@@ -67,9 +78,16 @@ export const handler = async (event) => {
       process.env.INVITE_REDIRECT_URL ||
       process.env.APP_URL ||
       (process.env.CONTEXT === 'production' ? 'https://restopay.xyz' : (process.env.URL || 'http://localhost:8888'))
+    const appName = process.env.APP_NAME || 'RestoPay'
 
     const { data: invited, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
       redirectTo: siteUrl,
+      data: {
+        app_name: appName,
+        app_url: siteUrl,
+        company_name: targetCompanyName,
+        invited_role: role,
+      },
     })
 
     if (inviteError) {
