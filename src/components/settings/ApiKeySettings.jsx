@@ -49,6 +49,7 @@ export default function ApiKeySettings({ companyId, onDirtyChange }) {
     setTimeout(() => setWebhookCopied(false), 2000)
   }
   const [showPostGridHelp, setShowPostGridHelp] = useState(false)
+  const [showPdfShiftHelp, setShowPdfShiftHelp] = useState(false)
   const [showResendHelp, setShowResendHelp] = useState(false)
 
   function normalize(data) {
@@ -176,7 +177,13 @@ export default function ApiKeySettings({ companyId, onDirtyChange }) {
       <div className="card" style={{ marginBottom: 20 }}>
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 4, display: 'flex', alignItems: 'center' }}>
           PDFShift (Letter PDFs)
+          <button type="button" style={helpBtnStyle} onClick={() => setShowPdfShiftHelp(v => !v)}>?</button>
         </h3>
+        {showPdfShiftHelp && (
+          <div style={tooltipStyle}>
+            Sign up at <a href="https://pdfshift.io" target="_blank" rel="noopener noreferrer">pdfshift.io</a>. Go to the dashboard to copy your API key, then paste it here so FUPM can generate letter PDFs for your company.
+          </div>
+        )}
         <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 14 }}>
           Each company must provide its own PDFShift API key to generate letter PDFs.
         </p>
