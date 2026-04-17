@@ -6,6 +6,7 @@ import ProtectedRoute from './components/ProtectedRoute.jsx'
 import AdminRoute from './components/AdminRoute.jsx'
 import Login from './pages/Login.jsx'
 import NoAccess from './pages/NoAccess.jsx'
+import AuthConfirm from './pages/AuthConfirm.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import JobDetail from './pages/JobDetail.jsx'
 import History from './pages/History.jsx'
@@ -40,6 +41,7 @@ export default function App() {
       <Routes>
         <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <Login />} />
         <Route path="/no-access" element={<NoAccess />} />
+        <Route path="/auth/confirm" element={<AuthConfirm />} />
 
         <Route element={<ProtectedRoute session={session} />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
