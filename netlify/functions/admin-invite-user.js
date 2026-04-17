@@ -61,8 +61,13 @@ export const handler = async (event) => {
     // Don't pass signup_app metadata — the DB trigger on auth.users
     // causes "database error saving new user". We handle user_app_access
     // and company_members manually below with the service role client.
-    // URL env var is auto-set by Netlify in production; fall back for local dev
-    const siteUrl = process.env.URL || 'http://localhost:8888'
+    // Netlify's URL env var points to the *.netlify.app hostname, so prefer
+    // an explicit app URL for auth emails and fall back to the custom domain.
+    const siteUrl =
+      process.env.INVITE_REDIRECT_URL ||
+      process.env.APP_URL ||
+      (process.env.CONTEXT === 'production' ? 'https://restopay.xyz' : (process.env.URL || 'http://localhost:8888'))
+
     const { data: invited, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
       redirectTo: siteUrl,
     })
