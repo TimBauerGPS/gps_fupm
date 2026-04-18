@@ -11,13 +11,15 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin + '/dashboard' },
+    const res = await fetch('/api/send-magic-link', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
     })
+    const data = await res.json()
     setLoading(false)
-    if (error) {
-      setError(error.message)
+    if (!res.ok) {
+      setError(data.error || 'Unable to send magic link')
     } else {
       setSent(true)
     }
@@ -40,7 +42,7 @@ export default function Login() {
 
         {sent ? (
           <div className="badge badge-success" style={{ padding: '12px 16px', borderRadius: 6, fontSize: 14 }}>
-            Check your email for a magic link to sign in.
+            If that email is registered, check your inbox for a message with the subject <strong>FUPM Magic Link</strong>.
           </div>
         ) : (
           <>

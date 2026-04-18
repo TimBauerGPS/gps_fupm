@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase.js'
+import { saveMemberProfile } from '../../lib/profile.js'
 
 export default function UserSettings({ companyId }) {
   const [members, setMembers] = useState([])
@@ -8,15 +9,28 @@ export default function UserSettings({ companyId }) {
   const [inviting, setInviting] = useState(false)
   const [inviteError, setInviteError] = useState('')
   const [inviteDone, setInviteDone] = useState(false)
+  const [loadingMembers, setLoadingMembers] = useState(true)
+  const [memberLoadError, setMemberLoadError] = useState('')
 
   useEffect(() => { loadMembers() }, [companyId])
 
   async function loadMembers() {
-    const { data } = await supabase
-      .from('company_members')
-      .select('*')
-      .eq('company_id', companyId)
-    setMembers(data || [])
+    setLoadingMembers(true)
+    setMemberLoadError('')
+
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      const res = await fetch('/api/company-members', {
+        headers: { Authorization: `Bearer ${session?.access_token}` },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Unable to load team members')
+      setMembers(data.members || [])
+    } catch (err) {
+      setMemberLoadError(err.message)
+    }
+
+    setLoadingMembers(false)
   }
 
   async function handleInvite(e) {
@@ -41,8 +55,13 @@ export default function UserSettings({ companyId }) {
   }
 
   async function updateMember(userId, updates) {
-    await supabase.from('company_members').update(updates).eq('user_id', userId).eq('company_id', companyId)
-    setMembers(m => m.map(x => x.user_id === userId ? { ...x, ...updates } : x))
+    try {
+      const updatedMember = await saveMemberProfile({ userId, companyId, ...updates })
+      setMembers(m => m.map(x => x.user_id === userId ? { ...x, ...updatedMember } : x))
+      setMemberLoadError('')
+    } catch (err) {
+      setMemberLoadError(err.message)
+    }
   }
 
   return (
@@ -71,7 +90,7 @@ export default function UserSettings({ companyId }) {
                 'Manage company branding & logo',
                 'Configure API keys (Twilio, PostGrid, Resend)',
                 'Create and edit letter templates',
-                'Invite and manage team members',
+                'Invite and manage team members, including account email visibility',
                 'Import jobs via CSV or Albi sync',
               ],
             },
@@ -116,20 +135,70 @@ export default function UserSettings({ companyId }) {
 
       <div className="card">
         <h3 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>Team Members</h3>
-        {members.map(m => (
-          <div key={m.user_id} style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: 16, marginBottom: 16 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 10 }}>
-              <span className={`badge ${m.role === 'admin' ? 'badge-success' : 'badge-pending'}`}>{m.role}</span>
-              <span style={{ fontFamily: 'monospace', fontSize: 11, color: 'var(--color-text-muted)' }}>{m.display_name || m.user_id}</span>
-            </div>
-            <div className="form-row">
-              <EditField label="Display Name ({{Rep}})" value={m.display_name} onSave={v => updateMember(m.user_id, { display_name: v })} />
-              <EditField label="Rep Phone ({{RepPhone}})" value={m.rep_phone} onSave={v => updateMember(m.user_id, { rep_phone: v })} />
-              <EditField label="Rep Email ({{RepEmail}})" value={m.rep_email} onSave={v => updateMember(m.user_id, { rep_email: v })} />
-            </div>
-          </div>
-        ))}
+        <p style={{ fontSize: 12, color: 'var(--color-text-muted)', marginBottom: 14 }}>
+          Account Email is the user’s login email. Rep Email controls the <code>{'{{RepEmail}}'}</code> merge tag in templates.
+        </p>
+        {memberLoadError && <p style={{ color: 'var(--color-danger)', fontSize: 13, marginBottom: 12 }}>{memberLoadError}</p>}
+        {loadingMembers ? (
+          <div style={{ textAlign: 'center', padding: 24 }}><div className="spinner" /></div>
+        ) : (
+          members.map(m => {
+            const accountStatus = getAccountStatus(m)
+
+            return (
+              <div key={m.user_id} style={{ borderBottom: '1px solid var(--color-border)', paddingBottom: 16, marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap', marginBottom: 10 }}>
+                  <span className={`badge ${m.role === 'admin' ? 'badge-success' : 'badge-pending'}`}>{m.role}</span>
+                  <span style={{ fontSize: 16, fontWeight: 700, color: 'var(--color-text)' }}>
+                    {m.display_name || m.auth_email || m.user_id}
+                  </span>
+                  <span className={`badge ${accountStatus.badge}`}>{accountStatus.label}</span>
+                </div>
+                <div className="form-row" style={{ marginBottom: 4 }}>
+                  <ReadOnlyField label="Account Email" value={m.auth_email || '—'} />
+                  <ReadOnlyField label="Account Status" value={accountStatus.detail} />
+                  <ReadOnlyField label="Last Sign In" value={formatDateTime(m.last_sign_in_at)} />
+                </div>
+                <div className="form-row">
+                  <EditField label="Display Name ({{Rep}})" value={m.display_name} onSave={v => updateMember(m.user_id, { display_name: v })} />
+                  <EditField label="Rep Phone ({{RepPhone}})" value={m.rep_phone} onSave={v => updateMember(m.user_id, { rep_phone: v })} />
+                  <EditField label="Rep Email ({{RepEmail}})" value={m.rep_email} onSave={v => updateMember(m.user_id, { rep_email: v })} />
+                </div>
+              </div>
+            )
+          })
+        )}
       </div>
+    </div>
+  )
+}
+
+function formatDateTime(value) {
+  return value ? new Date(value).toLocaleString() : '—'
+}
+
+function getAccountStatus(member) {
+  if (member.last_sign_in_at) {
+    return { label: 'Active', badge: 'badge-success', detail: `Signed in ${formatDateTime(member.last_sign_in_at)}` }
+  }
+
+  if (member.email_confirmed_at) {
+    return { label: 'Registered', badge: 'badge-success', detail: `Email confirmed ${formatDateTime(member.email_confirmed_at)}` }
+  }
+
+  if (member.invited_at || member.confirmation_sent_at) {
+    const sentAt = member.invited_at || member.confirmation_sent_at
+    return { label: 'Invite sent', badge: 'badge-pending', detail: `Invite sent ${formatDateTime(sentAt)}` }
+  }
+
+  return { label: 'Pending setup', badge: 'badge-pending', detail: 'No sign-in activity yet' }
+}
+
+function ReadOnlyField({ label, value }) {
+  return (
+    <div className="form-group">
+      <label>{label}</label>
+      <input value={value || ''} disabled />
     </div>
   )
 }

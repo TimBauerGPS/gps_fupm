@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { parseAlbiCSV } from '../lib/albiImport.js'
+import { saveMemberProfile } from '../lib/profile.js'
 
 export default function Profile() {
   const [member, setMember]       = useState(null)
@@ -8,6 +9,7 @@ export default function Profile() {
   const [form, setForm]           = useState({ display_name: '', rep_phone: '', rep_email: '' })
   const [profileSaving, setProfileSaving] = useState(false)
   const [profileSaved, setProfileSaved]   = useState(false)
+  const [profileError, setProfileError]   = useState('')
 
   // Import state
   const [sheetUrl, setSheetUrl]           = useState('')
@@ -72,14 +74,29 @@ export default function Profile() {
   async function handleProfileSave(e) {
     e.preventDefault()
     setProfileSaving(true)
-    await supabase
-      .from('company_members')
-      .update({ display_name: form.display_name, rep_phone: form.rep_phone, rep_email: form.rep_email })
-      .eq('user_id', member.user_id)
-      .eq('company_id', companyId)
+    setProfileError('')
+
+    try {
+      const updatedMember = await saveMemberProfile({
+        userId: member.user_id,
+        companyId,
+        display_name: form.display_name,
+        rep_phone: form.rep_phone,
+        rep_email: form.rep_email,
+      })
+      setMember(updatedMember)
+      setForm({
+        display_name: updatedMember.display_name || '',
+        rep_phone: updatedMember.rep_phone || '',
+        rep_email: updatedMember.rep_email || '',
+      })
+      setProfileSaved(true)
+      setTimeout(() => setProfileSaved(false), 2500)
+    } catch (err) {
+      setProfileError(err.message)
+    }
+
     setProfileSaving(false)
-    setProfileSaved(true)
-    setTimeout(() => setProfileSaved(false), 2500)
   }
 
   async function handleSheetSave(e) {
@@ -212,6 +229,7 @@ export default function Profile() {
             </button>
             {profileSaved && <span style={{ color: 'var(--color-success)', fontSize: 13 }}>✓ Saved</span>}
           </div>
+          {profileError && <p style={{ color: 'var(--color-danger)', fontSize: 13, marginTop: 10 }}>{profileError}</p>}
         </div>
       </form>
 

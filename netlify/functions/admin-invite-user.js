@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { seedDefaultTemplates } from '../../supabase/seed/default-templates.js'
+import { getAuthEmailConfig, sendAuthEmail } from './_authEmail.js'
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -69,34 +70,38 @@ export const handler = async (event) => {
       targetCompanyName = company?.name || null
     }
 
-    // Don't pass signup_app metadata — the DB trigger on auth.users
-    // causes "database error saving new user". We handle user_app_access
-    // and company_members manually below with the service role client.
-    // Never fall back to Netlify's URL env var here because it may point at
-    // a *.netlify.app hostname or a preview deploy. Invites should always use
-    // the app's canonical URL unless we're running locally in Netlify Dev.
-    const defaultInviteUrl = process.env.NETLIFY_DEV === 'true'
-      ? 'http://localhost:8888'
-      : 'https://restopay.xyz'
-    const siteUrl = (
-      process.env.INVITE_REDIRECT_URL ||
-      process.env.APP_URL ||
-      defaultInviteUrl
-    ).replace(/\/+$/, '')
-    const appName = process.env.APP_NAME || 'RestoPay'
+    const { appName, siteUrl, redirectTo } = getAuthEmailConfig()
 
-    const { data: invited, error: inviteError } = await supabase.auth.admin.inviteUserByEmail(email, {
-      redirectTo: siteUrl,
-      data: {
-        app_name: appName,
-        app_url: siteUrl,
-        company_name: targetCompanyName,
-        invited_role: role,
+    let inviteResult = await supabase.auth.admin.generateLink({
+      type: 'invite',
+      email,
+      options: {
+        redirectTo,
+        data: {
+          app_name: appName,
+          app_url: siteUrl,
+          company_name: targetCompanyName,
+          invited_role: role,
+        },
       },
     })
 
-    if (inviteError) {
-      return { statusCode: 400, body: JSON.stringify({ error: inviteError.message }) }
+    if (inviteResult.error && ['email_exists', 'user_already_exists'].includes(inviteResult.error.code)) {
+      inviteResult = await supabase.auth.admin.generateLink({
+        type: 'magiclink',
+        email,
+        options: { redirectTo },
+      })
+    }
+
+    if (inviteResult.error) {
+      return { statusCode: 400, body: JSON.stringify({ error: inviteResult.error.message }) }
+    }
+
+    const invited = inviteResult.data
+    const actionLink = invited?.properties?.action_link
+    if (!invited?.user?.id || !actionLink) {
+      return { statusCode: 500, body: JSON.stringify({ error: 'Invite link could not be generated' }) }
     }
 
     // Grant app access (replaces what the DB trigger would have done)
@@ -134,6 +139,14 @@ export const handler = async (event) => {
       try { await seedDefaultTemplates(supabase, targetCompanyId) }
       catch (e) { console.error('Template seed error:', e.message) }
     }
+
+    await sendAuthEmail({
+      toEmail: email,
+      actionLink,
+      companyName: targetCompanyName,
+      role,
+      mode: 'invite',
+    })
 
     return { statusCode: 200, body: JSON.stringify({ ok: true, userId: invited.user.id }) }
   } catch (err) {

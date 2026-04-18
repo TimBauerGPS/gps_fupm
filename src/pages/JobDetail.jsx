@@ -7,6 +7,7 @@ import LetterPreview from '../components/LetterPreview.jsx'
 import SendPanel from '../components/SendPanel.jsx'
 import HistoryTable from '../components/HistoryTable.jsx'
 import { mergeTemplate, buildMergeData } from '../lib/mergeTemplate.js'
+import { hasCompleteProfile } from '../lib/profile.js'
 import { askTagToLabel } from '../components/MergeTagPicker.jsx'
 
 export default function JobDetail() {
@@ -61,7 +62,7 @@ export default function JobDetail() {
     const warnings = []
     if (!settings?.logo_url)
       warnings.push({ field: 'Company logo', tab: 'branding' })
-    if (!member?.display_name || !member?.rep_phone || !member?.rep_email)
+    if (!hasCompleteProfile(member))
       warnings.push({ field: 'Your rep name, phone, and email', tab: 'users' })
     if (!settings?.company_name || !settings?.address_line1 || !settings?.city || !settings?.state || !settings?.zip)
       warnings.push({ field: 'Company name and address', tab: 'branding' })
