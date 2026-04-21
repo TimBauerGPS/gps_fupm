@@ -1,4 +1,5 @@
 import { formatCurrency, formatPhone } from '../lib/formatters.js'
+import { getJobBalance } from '../lib/jobUtils.js'
 
 function extractUrl(val) {
   if (!val) return null
@@ -8,12 +9,24 @@ function extractUrl(val) {
   return null
 }
 
-export default function JobCard({ job, onChange }) {
+export default function JobCard({
+  job,
+  onChange,
+  onPendingChange,
+  onInvoiceDateChange,
+  onBalanceSave,
+  savingPending,
+  pendingError,
+  balanceSaving,
+  balanceSaved,
+}) {
   function update(field, value) {
     onChange({ ...job, [field]: value })
   }
 
-  const balance = (job.total_invoice_amount || 0) - (job.total_payment_amount || 0)
+  const balance = getJobBalance(job)
+  const calculatedBalance = (Number(job.total_invoice_amount) || 0) - (Number(job.total_payment_amount) || 0)
+  const hasBalanceOverride = job.balance_override_amount !== null && job.balance_override_amount !== undefined
 
   return (
     <div className="card">
@@ -25,11 +38,32 @@ export default function JobCard({ job, onChange }) {
         <Field label="Phone" value={formatPhone(job.customer_phone_number)} onChange={v => update('customer_phone_number', v.replace(/\D/g, ''))} />
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
-        <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--color-primary)' }}>
-          Balance: {formatCurrency(balance)}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 16, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div style={{ minWidth: 260, flex: 1 }}>
+          <label>Balance Due</label>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+            <input
+              type="number"
+              step="0.01"
+              value={job.balance_override_amount ?? balance}
+              onChange={e => update('balance_override_amount', e.target.value)}
+              onBlur={() => onBalanceSave?.(job.balance_override_amount)}
+              style={{ maxWidth: 160, fontWeight: 700, color: 'var(--color-primary)' }}
+            />
+            <button
+              type="button"
+              className="btn-secondary"
+              style={{ fontSize: 12, padding: '6px 10px' }}
+              disabled={balanceSaving}
+              onClick={() => onBalanceSave?.(job.balance_override_amount)}
+            >
+              {balanceSaving ? 'Saving...' : 'Save'}
+            </button>
+            {balanceSaved && <span style={{ fontSize: 12, color: 'var(--color-success)', fontWeight: 600 }}>Saved</span>}
+          </div>
           <span style={{ fontWeight: 400, fontSize: 12, color: 'var(--color-text-muted)', marginLeft: 10 }}>
-            Invoice {formatCurrency(job.total_invoice_amount)} − Paid {formatCurrency(job.total_payment_amount)}
+            Invoice {formatCurrency(job.total_invoice_amount)} - Paid {formatCurrency(job.total_payment_amount)}
+            {hasBalanceOverride && ` | Imported balance was ${formatCurrency(calculatedBalance)}`}
           </span>
         </div>
         {extractUrl(job.link_to_project) && (
@@ -66,6 +100,38 @@ export default function JobCard({ job, onChange }) {
           <Field label="State" value={job.mailing_state} onChange={v => update('mailing_state', v)} style={{ maxWidth: 80 }} />
           <Field label="ZIP" value={job.mailing_zip_code} onChange={v => update('mailing_zip_code', v)} style={{ maxWidth: 100 }} />
         </div>
+        <div
+          style={{
+            display: 'grid',
+            gridTemplateColumns: 'minmax(220px, max-content) minmax(180px, 260px)',
+            gap: 16,
+            alignItems: 'end',
+            marginTop: 10,
+          }}
+        >
+          <label style={{ display: 'flex', alignItems: 'center', gap: 8, textTransform: 'none', letterSpacing: 0, fontSize: 13, color: 'var(--color-text)' }}>
+            <input
+              type="checkbox"
+              checked={!!job.pending_insurance_approval}
+              onChange={e => onPendingChange?.(e.target.checked)}
+              disabled={savingPending}
+              style={{ width: 'auto' }}
+            />
+            Pending Insurance Approval
+          </label>
+          <div className="form-group" style={{ marginBottom: 0 }}>
+            <label>Invoice Date</label>
+            <input
+              type="date"
+              value={job.pending_invoice_date || ''}
+              disabled={!job.pending_insurance_approval || savingPending}
+              onChange={e => onInvoiceDateChange?.(e.target.value)}
+            />
+          </div>
+        </div>
+        {pendingError && (
+          <p style={{ color: 'var(--color-danger)', fontSize: 12, marginTop: 8 }}>{pendingError}</p>
+        )}
       </div>
     </div>
   )

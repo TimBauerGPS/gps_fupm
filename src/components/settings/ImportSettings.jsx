@@ -100,7 +100,7 @@ export default function ImportSettings({ companyId, onDirtyChange }) {
       const jobs = parseAlbiCSV(text)
       if (jobs.length === 0) throw new Error('No valid rows found in CSV')
 
-      const rows = jobs.map(j => ({ ...j, company_id: companyId }))
+      const rows = jobs.map(j => ({ ...j, company_id: companyId, balance_override_amount: null }))
       const { error, count } = await supabase
         .from('albi_jobs')
         .upsert(rows, { onConflict: 'company_id,name', count: 'exact' })

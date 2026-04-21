@@ -1,3 +1,5 @@
+import { getJobBalance } from './jobUtils.js'
+
 /**
  * Replace all {{Tag}} placeholders in an HTML template body with values from data.
  * Unmatched tags are left as-is.
@@ -17,7 +19,7 @@ export function mergeTemplate(html, data) {
  * Build the merge data object from a job row, company settings, and user member record.
  */
 export function buildMergeData({ job, settings, member, customFields = {} }) {
-  const balance = ((job.total_invoice_amount || 0) - (job.total_payment_amount || 0))
+  const balance = getJobBalance(job)
   const formattedBalance = new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency: 'USD',

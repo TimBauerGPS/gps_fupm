@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase.js'
 import { formatCurrency, formatPhone } from '../lib/formatters.js'
+import { getJobBalance } from '../lib/jobUtils.js'
 import ChannelSelector from './ChannelSelector.jsx'
 import SmsCompose from './SmsCompose.jsx'
 import EmailCompose from './EmailCompose.jsx'
@@ -32,7 +33,7 @@ export default function SendPanel({ job, renderedHtml, template, settings, membe
   const [toasts, setToasts] = useState([])
   const [mailingOverride, setMailingOverride] = useState(null)
 
-  const balance = (job.total_invoice_amount || 0) - (job.total_payment_amount || 0)
+  const balance = getJobBalance(job)
   const emailDomainMissing = channels.includes('email') && !settings?.resend_from_domain
   const derivedMailing = {
     line1: job.mailing_address_1 || job.address_1,

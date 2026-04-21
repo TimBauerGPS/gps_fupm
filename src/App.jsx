@@ -9,6 +9,7 @@ import NoAccess from './pages/NoAccess.jsx'
 import AuthConfirm from './pages/AuthConfirm.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import JobDetail from './pages/JobDetail.jsx'
+import JobsPendingApproval from './pages/JobsPendingApproval.jsx'
 import History from './pages/History.jsx'
 import Inbox from './pages/Inbox.jsx'
 import Profile from './pages/Profile.jsx'
@@ -47,6 +48,7 @@ export default function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/jobs/:jobName" element={<JobDetail />} />
+          <Route path="/jobs-pending-approval" element={<JobsPendingApproval />} />
           <Route path="/inbox" element={<Inbox />} />
           <Route path="/history" element={<History />} />
           <Route path="/profile" element={<Profile />} />

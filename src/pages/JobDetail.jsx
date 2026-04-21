@@ -26,6 +26,10 @@ export default function JobDetail() {
   const [error, setError] = useState('')
   const [preflightWarnings, setPreflightWarnings] = useState([])
   const [customFields, setCustomFields] = useState({})   // ask_* tag values
+  const [pendingError, setPendingError] = useState('')
+  const [savingPending, setSavingPending] = useState(false)
+  const [balanceSaving, setBalanceSaving] = useState(false)
+  const [balanceSaved, setBalanceSaved] = useState(false)
 
   useEffect(() => {
     async function load() {
@@ -58,6 +62,31 @@ export default function JobDetail() {
     load()
   }, [jobName])
 
+  const hasInvalidPendingApproval = !!job?.pending_insurance_approval && !job?.pending_invoice_date
+
+  useEffect(() => {
+    if (!hasInvalidPendingApproval) return
+    function onBeforeUnload(e) {
+      e.preventDefault()
+      e.returnValue = ''
+    }
+    function onDocumentClick(e) {
+      const link = e.target.closest?.('a[href]')
+      if (!link) return
+      const url = new URL(link.href, window.location.href)
+      const isInternalNavigation = url.origin === window.location.origin && url.pathname !== window.location.pathname
+      if (!isInternalNavigation) return
+      e.preventDefault()
+      setPendingError('Add an invoice date before leaving this job, or uncheck Pending Insurance Approval.')
+    }
+    window.addEventListener('beforeunload', onBeforeUnload)
+    document.addEventListener('click', onDocumentClick, true)
+    return () => {
+      window.removeEventListener('beforeunload', onBeforeUnload)
+      document.removeEventListener('click', onDocumentClick, true)
+    }
+  }, [hasInvalidPendingApproval])
+
   function getPreflightWarnings() {
     const warnings = []
     if (!settings?.logo_url)
@@ -70,6 +99,10 @@ export default function JobDetail() {
   }
 
   function handleGenerate() {
+    if (hasInvalidPendingApproval) {
+      setPendingError('Add an invoice date before leaving this job or generating a letter.')
+      return
+    }
     if (!selectedTemplate) return
     const warnings = getPreflightWarnings()
     setPreflightWarnings(warnings)
@@ -77,6 +110,86 @@ export default function JobDetail() {
     const html = mergeTemplate(selectedTemplate.body, mergeData)
     setRenderedHtml(html)
     setShowSendPanel(false)
+  }
+
+  async function saveJobUpdates(updates) {
+    const { data: { session } } = await supabase.auth.getSession()
+    const res = await fetch('/api/update-job-flags', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token}` },
+      body: JSON.stringify({ jobId: job.id, updates }),
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error || 'Could not save job')
+    setJob(data.job)
+    return data.job
+  }
+
+  async function handlePendingChange(checked) {
+    setPendingError('')
+    if (!checked) {
+      if (!window.confirm('Remove this job from Jobs Pending Approval and delete the invoice date?')) return
+      setSavingPending(true)
+      try {
+        await saveJobUpdates({
+          pending_insurance_approval: false,
+          pending_invoice_date: null,
+        })
+      } catch (err) {
+        setPendingError(err.message)
+      }
+      setSavingPending(false)
+      return
+    }
+
+    setJob(current => ({ ...current, pending_insurance_approval: true }))
+    setPendingError('Add an invoice date to save this job as pending insurance approval.')
+  }
+
+  async function handleInvoiceDateChange(value) {
+    setJob(current => ({ ...current, pending_invoice_date: value }))
+    setPendingError('')
+    if (!job.pending_insurance_approval || !value) return
+    setSavingPending(true)
+    try {
+      await saveJobUpdates({
+        pending_insurance_approval: true,
+        pending_invoice_date: value,
+      })
+      setPendingError('')
+    } catch (err) {
+      setPendingError(err.message)
+    }
+    setSavingPending(false)
+  }
+
+  async function handleBalanceSave(value) {
+    setBalanceSaving(true)
+    setBalanceSaved(false)
+    try {
+      await saveJobUpdates({ balance_override_amount: value })
+      setBalanceSaved(true)
+      setTimeout(() => setBalanceSaved(false), 2200)
+    } catch (err) {
+      setPendingError(err.message)
+    }
+    setBalanceSaving(false)
+  }
+
+  function handleBack() {
+    if (hasInvalidPendingApproval) {
+      setPendingError('Add an invoice date before leaving this job, or uncheck Pending Insurance Approval.')
+      return
+    }
+    navigate('/dashboard')
+  }
+
+  function handleContinueToSend() {
+    if (hasInvalidPendingApproval) {
+      setPendingError('Add an invoice date before continuing to send.')
+      return
+    }
+    setShowSendPanel(true)
   }
 
   // Detect {{ask_...}} tags in the selected template body
@@ -103,8 +216,8 @@ export default function JobDetail() {
     <div className="page">
       <div className="page-header">
         <div>
-          <button className="btn-secondary" style={{ fontSize: 12, marginBottom: 8 }} onClick={() => navigate('/dashboard')}>
-            ← Back
+          <button className="btn-secondary" style={{ fontSize: 12, marginBottom: 8 }} onClick={handleBack}>
+            Back
           </button>
           <h1 className="page-title">{job.name}</h1>
           <p style={{ color: 'var(--color-text-muted)', fontSize: 13 }}>{job.customer}</p>
@@ -121,12 +234,22 @@ export default function JobDetail() {
             className="btn-secondary"
             style={{ fontSize: 13, padding: '5px 14px', textDecoration: 'none' }}
           >
-            Open in Albi →
+            Open in Albi
           </a>
         </div>
       )}
 
-      <JobCard job={job} onChange={setJob} />
+      <JobCard
+        job={job}
+        onChange={setJob}
+        onPendingChange={handlePendingChange}
+        onInvoiceDateChange={handleInvoiceDateChange}
+        onBalanceSave={handleBalanceSave}
+        savingPending={savingPending}
+        pendingError={pendingError}
+        balanceSaving={balanceSaving}
+        balanceSaved={balanceSaved}
+      />
 
       <div className="card" style={{ marginTop: 20 }}>
         <h2 style={{ fontSize: 14, fontWeight: 700, marginBottom: 14 }}>Generate Letter</h2>
@@ -209,8 +332,8 @@ export default function JobDetail() {
           />
           {!showSendPanel && (
             <div style={{ textAlign: 'center', marginTop: 16 }}>
-              <button className="btn-primary" style={{ fontSize: 15, padding: '10px 32px' }} onClick={() => setShowSendPanel(true)}>
-                Continue to Send →
+              <button className="btn-primary" style={{ fontSize: 15, padding: '10px 32px' }} onClick={handleContinueToSend}>
+                Continue to Send
               </button>
             </div>
           )}

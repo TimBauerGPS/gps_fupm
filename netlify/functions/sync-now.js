@@ -58,7 +58,7 @@ export const handler = async (event) => {
       return { statusCode: 200, body: JSON.stringify({ error: 'Sheet is accessible but no valid job rows were found. Check that the sheet has a "Name" column header.' }) }
     }
 
-    const upsertRows = jobs.map(j => ({ ...j, company_id: companyId }))
+    const upsertRows = jobs.map(j => ({ ...j, company_id: companyId, balance_override_amount: null }))
     const { error: upsertError } = await supabase
       .from('albi_jobs')
       .upsert(upsertRows, { onConflict: 'company_id,name' })

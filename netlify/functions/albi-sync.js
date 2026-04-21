@@ -41,7 +41,7 @@ export const handler = async () => {
           continue
         }
 
-        const upsertRows = jobs.map(j => ({ ...j, company_id }))
+        const upsertRows = jobs.map(j => ({ ...j, company_id, balance_override_amount: null }))
         const { error: upsertError, count } = await supabase
           .from('albi_jobs')
           .upsert(upsertRows, { onConflict: 'company_id,name', count: 'exact' })
