@@ -10,10 +10,11 @@ export function classifyJobType(jobName) {
   if (name.includes('RBL') || name.includes('STR')) return 'Rebuild'
   if (name.includes('FIRE') || name.includes('SMK')) return 'Fire/Smoke'
   if (name.includes('EMS') || name.includes('WTR')) return 'Water'
+  if (name.includes('CTS') || name.includes('CON')) return 'Contents'
   return 'Mold/BIO/Other'
 }
 
-export const PENDING_JOB_TYPES = ['Rebuild', 'Fire/Smoke', 'Water', 'Mold/BIO/Other']
+export const PENDING_JOB_TYPES = ['Rebuild', 'Fire/Smoke', 'Water', 'Contents', 'Mold/BIO/Other']
 
 export function daysSince(dateString) {
   if (!dateString) return null
