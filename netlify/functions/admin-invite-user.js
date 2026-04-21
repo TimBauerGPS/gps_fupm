@@ -1,6 +1,6 @@
 import { createClient } from '@supabase/supabase-js'
 import { seedDefaultTemplates } from '../../supabase/seed/default-templates.js'
-import { getAuthEmailConfig, sendAuthEmail } from './_authEmail.js'
+import { getAuthEmailConfig, getCompanyAuthEmailOptions, sendAuthEmail } from './_authEmail.js'
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -146,6 +146,7 @@ export const handler = async (event) => {
       companyName: targetCompanyName,
       role,
       mode: 'invite',
+      emailOptions: await getCompanyAuthEmailOptions(supabase, targetCompanyId),
     })
 
     return { statusCode: 200, body: JSON.stringify({ ok: true, userId: invited.user.id }) }

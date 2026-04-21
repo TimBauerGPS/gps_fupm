@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js'
-import { getAuthEmailConfig, sendAuthEmail } from './_authEmail.js'
+import { getAuthEmailConfig, getCompanyAuthEmailOptions, sendAuthEmail } from './_authEmail.js'
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
@@ -39,10 +39,24 @@ export const handler = async (event) => {
       throw new Error('Magic link could not be generated')
     }
 
+    let emailOptions = {}
+    if (data?.user?.id) {
+      const { data: member } = await supabase
+        .from('company_members')
+        .select('company_id')
+        .eq('user_id', data.user.id)
+        .maybeSingle()
+
+      if (member?.company_id) {
+        emailOptions = await getCompanyAuthEmailOptions(supabase, member.company_id)
+      }
+    }
+
     await sendAuthEmail({
       toEmail: normalizedEmail,
       actionLink,
       mode: 'magiclink',
+      emailOptions,
     })
 
     return { statusCode: 200, body: JSON.stringify({ ok: true }) }

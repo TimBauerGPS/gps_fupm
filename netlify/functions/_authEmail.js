@@ -8,7 +8,7 @@ function escapeHtml(value) {
     .replaceAll('"', '&quot;')
 }
 
-export function getAuthEmailConfig() {
+export function getAuthEmailConfig(overrides = {}) {
   const defaultSiteUrl = process.env.NETLIFY_DEV === 'true'
     ? 'http://localhost:8888'
     : 'https://fupm.netlify.app'
@@ -20,8 +20,8 @@ export function getAuthEmailConfig() {
   ).replace(/\/+$/, '')
 
   const appName = process.env.APP_NAME || 'FUPM'
-  const fromDomain = (process.env.RESEND_FROM_DOMAIN || new URL(siteUrl).hostname).trim()
-  const fromEmail = process.env.RESEND_FROM_EMAIL || `noreply@${fromDomain}`
+  const fromDomain = (overrides.fromDomain || process.env.RESEND_FROM_DOMAIN || new URL(siteUrl).hostname).trim()
+  const fromEmail = overrides.fromEmail || process.env.RESEND_FROM_EMAIL || `noreply@${fromDomain}`
 
   return {
     appName,
@@ -31,13 +31,31 @@ export function getAuthEmailConfig() {
   }
 }
 
-export async function sendAuthEmail({ toEmail, actionLink, companyName, role, mode }) {
-  if (!process.env.RESEND_API_KEY) {
-    throw new Error('RESEND_API_KEY is not configured for auth emails')
+export async function getCompanyAuthEmailOptions(supabase, companyId) {
+  if (!companyId) return {}
+
+  const { data: settings, error } = await supabase
+    .from('company_settings')
+    .select('resend_api_key, resend_from_domain')
+    .eq('company_id', companyId)
+    .maybeSingle()
+
+  if (error) throw error
+
+  return {
+    apiKey: settings?.resend_api_key || null,
+    fromDomain: settings?.resend_from_domain || null,
+  }
+}
+
+export async function sendAuthEmail({ toEmail, actionLink, companyName, role, mode, emailOptions = {} }) {
+  const apiKey = emailOptions.apiKey || process.env.RESEND_API_KEY
+  if (!apiKey) {
+    throw new Error('Resend is not configured for auth emails. Add RESEND_API_KEY in Netlify or a Resend API key in Settings > API Keys.')
   }
 
-  const { appName, fromEmail } = getAuthEmailConfig()
-  const resend = new Resend(process.env.RESEND_API_KEY)
+  const { appName, fromEmail } = getAuthEmailConfig(emailOptions)
+  const resend = new Resend(apiKey)
   const safeAppName = escapeHtml(appName)
   const safeActionLink = escapeHtml(actionLink)
   const safeCompanyName = companyName ? escapeHtml(companyName) : null
