@@ -13,9 +13,9 @@ export default function SendPanel({ job, renderedHtml, template, settings, membe
   const [channels, setChannels] = useState([])
   const [smsBody, setSmsBody] = useState(() => defaultSms(job, member, settings))
   const [emailSubject, setEmailSubject] = useState(
-    `${job.name}: Communication regarding your account with ${settings?.company_name || 'our company'}`
+    () => defaultEmailSubject(job, template)
   )
-  const [emailBodyText, setEmailBodyText] = useState(() => defaultEmailBody(job, member, settings))
+  const [emailBodyText, setEmailBodyText] = useState(() => htmlToEmailText(renderedHtml))
   const [emailCc, setEmailCc] = useState(member?.rep_email || '')
   const [mailRecipient, setMailRecipient] = useState(() => {
     const parts = (job.customer || '').trim().split(/\s+/)
@@ -365,17 +365,52 @@ function defaultSms(job, member, settings) {
   return `Hi ${name}, this is ${rep} from ${company}. We are reaching out regarding your project balance. Please see the attached letter for details.`
 }
 
-function defaultEmailBody(job, member, settings) {
-  const name = job.customer || 'Valued Customer'
-  const company = settings?.company_name || 'our company'
+function defaultEmailSubject(job, template) {
+  return [job.name, [template?.name, todayMmDdYyyy()].filter(Boolean).join(' ')].filter(Boolean).join(': ')
+}
 
-  const footerLines = [
-    member?.display_name || '',
-    member?.rep_phone    || '',
-    member?.rep_email    || '',
-    company,
-  ].filter(Boolean)
-  const footer = footerLines.join('\n')
+function todayMmDdYyyy() {
+  const today = new Date()
+  return [
+    String(today.getMonth() + 1).padStart(2, '0'),
+    String(today.getDate()).padStart(2, '0'),
+    today.getFullYear(),
+  ].join('/')
+}
 
-  return `Hi ${name},\n\nPlease see the attached letter regarding your project balance with ${company}.\n\nIf you have any questions, please don't hesitate to reach out.\n\nBest regards,\n${footer}`
+function htmlToEmailText(html = '') {
+  if (!html) return ''
+
+  if (typeof document !== 'undefined') {
+    const container = document.createElement('div')
+    container.innerHTML = html
+
+    container.querySelectorAll('br').forEach(br => br.replaceWith('\n'))
+    container.querySelectorAll('p, div, h1, h2, h3, h4, h5, h6, li').forEach(el => {
+      el.appendChild(document.createTextNode('\n'))
+    })
+
+    return normalizeEmailText(container.textContent || '')
+  }
+
+  return normalizeEmailText(
+    html
+      .replace(/<br\s*\/?>/gi, '\n')
+      .replace(/<\/(p|div|h[1-6]|li)>/gi, '\n')
+      .replace(/<[^>]+>/g, '')
+      .replace(/&nbsp;/g, ' ')
+      .replace(/&amp;/g, '&')
+      .replace(/&lt;/g, '<')
+      .replace(/&gt;/g, '>')
+      .replace(/&quot;/g, '"')
+      .replace(/&#39;/g, "'")
+  )
+}
+
+function normalizeEmailText(text) {
+  return text
+    .replace(/\r\n/g, '\n')
+    .replace(/[ \t]+\n/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim()
 }
