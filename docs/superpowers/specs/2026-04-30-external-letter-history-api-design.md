@@ -271,6 +271,7 @@ Imported projects that have no communication history should return a successful 
 - Admin-only Netlify functions for API key creation, listing, and revocation.
 - Settings UI section visible only to `tbauer+allied@alliedrestoration.com`.
 - Send history save path update so future rows snapshot the selected template slug.
+- External API reference document for the app consuming this API.
 
 ## Testing Plan
 
