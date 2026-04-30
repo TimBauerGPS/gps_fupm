@@ -6,15 +6,20 @@ import ApiKeySettings from '../components/settings/ApiKeySettings.jsx'
 import TemplateSettings from '../components/settings/TemplateSettings.jsx'
 import UserSettings from '../components/settings/UserSettings.jsx'
 import ImportSettings from '../components/settings/ImportSettings.jsx'
+import ExternalApiKeySettings from '../components/settings/ExternalApiKeySettings.jsx'
+
+const EXTERNAL_API_ADMIN_EMAIL = 'tbauer+allied@alliedrestoration.com'
 
 export default function Settings() {
   const [companyId, setCompanyId] = useState(null)
+  const [userEmail, setUserEmail] = useState('')
   const [isDirty, setIsDirty] = useState(false)
   const navigate = useNavigate()
 
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       if (!session) return
+      setUserEmail(session.user.email || '')
       const { data } = await supabase
         .from('company_members')
         .select('company_id')
@@ -43,6 +48,8 @@ export default function Settings() {
     }
   }
 
+  const canManageExternalApi = userEmail.toLowerCase() === EXTERNAL_API_ADMIN_EMAIL
+
   const tabs = [
     { to: '/settings/branding', label: 'Branding & Company' },
     { to: '/settings/api-keys', label: 'API Keys' },
@@ -50,6 +57,10 @@ export default function Settings() {
     { to: '/settings/users', label: 'Users' },
     { to: '/settings/import', label: 'Import' },
   ]
+
+  if (canManageExternalApi) {
+    tabs.push({ to: '/settings/external-api', label: 'External API' })
+  }
 
   return (
     <div className="page">
@@ -84,6 +95,9 @@ export default function Settings() {
           <Route path="templates"  element={<TemplateSettings companyId={companyId} onDirtyChange={setIsDirty} />} />
           <Route path="users"      element={<UserSettings companyId={companyId} onDirtyChange={setIsDirty} />} />
           <Route path="import"     element={<ImportSettings companyId={companyId} onDirtyChange={setIsDirty} />} />
+          {canManageExternalApi && (
+            <Route path="external-api" element={<ExternalApiKeySettings />} />
+          )}
           <Route path="*"          element={<BrandingSettings companyId={companyId} onDirtyChange={setIsDirty} />} />
         </Routes>
       ) : (

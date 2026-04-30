@@ -208,10 +208,6 @@ set letter_api_slug = lt.api_slug
 from letter_templates lt
 where ch.template_id = lt.id
   and ch.letter_api_slug is null;
-
-update communication_history
-set letter_api_slug = fupm_slugify_letter_type(template_name)
-where letter_api_slug is null;
 ```
 
 - [ ] **Step 6: Update template settings to manage slugs**
@@ -408,18 +404,18 @@ Add these redirects before the existing generic `/api/*` redirect in `netlify.to
   status = 200
 
 [[redirects]]
-  from = "/api/external/projects/:projectName/link"
-  to = "/.netlify/functions/external-project-link?projectName=:projectName"
+  from = "/api/external/project-link"
+  to = "/.netlify/functions/external-project-link"
   status = 200
 
 [[redirects]]
-  from = "/api/external/projects/:projectName/letters"
-  to = "/.netlify/functions/external-project-letters?projectName=:projectName"
+  from = "/api/external/project-letters"
+  to = "/.netlify/functions/external-project-letters"
   status = 200
 
 [[redirects]]
-  from = "/api/external/projects/:projectName/letters/:letterSlug"
-  to = "/.netlify/functions/external-project-letter-status?projectName=:projectName&letterSlug=:letterSlug"
+  from = "/api/external/project-letter-status"
+  to = "/.netlify/functions/external-project-letter-status"
   status = 200
 ```
 
@@ -527,15 +523,9 @@ Expected: exits 0.
 **Files:**
 - Modify: `docs/integrations/external-letter-history-api-reference.md`
 
-- [ ] **Step 1: Update API reference status**
+- [ ] **Step 1: Confirm API reference status**
 
-Change:
-
-```text
-Status: planned API contract
-```
-
-to:
+Confirm the reference contains:
 
 ```text
 Status: implemented

@@ -23,6 +23,26 @@
   schedule = "0 2 * * *"   # 2:00 AM UTC = 6 PM PT
 
 [[redirects]]
+  from = "/api/external/letter-types"
+  to = "/.netlify/functions/external-letter-types"
+  status = 200
+
+[[redirects]]
+  from = "/api/external/project-link"
+  to = "/.netlify/functions/external-project-link"
+  status = 200
+
+[[redirects]]
+  from = "/api/external/project-letters"
+  to = "/.netlify/functions/external-project-letters"
+  status = 200
+
+[[redirects]]
+  from = "/api/external/project-letter-status"
+  to = "/.netlify/functions/external-project-letter-status"
+  status = 200
+
+[[redirects]]
   from = "/api/*"
   to = "/.netlify/functions/:splat"
   status = 200

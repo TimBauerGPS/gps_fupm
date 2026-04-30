@@ -16,13 +16,63 @@ export const handler = async (event) => {
   const { data: { user }, error: authError } = await supabase.auth.getUser(token)
   if (authError || !user) return { statusCode: 401, body: 'Unauthorized' }
 
-  const body = JSON.parse(event.body)
+  const body = JSON.parse(event.body || '{}')
+  if (!body.companyId || !body.jobName) {
+    return { statusCode: 400, body: JSON.stringify({ error: 'companyId and jobName are required' }) }
+  }
+
+  const { data: member, error: memberError } = await supabase
+    .from('company_members')
+    .select('company_id')
+    .eq('user_id', user.id)
+    .eq('company_id', body.companyId)
+    .maybeSingle()
+
+  if (memberError) {
+    return { statusCode: 500, body: JSON.stringify({ error: memberError.message }) }
+  }
+  if (!member) {
+    return { statusCode: 403, body: JSON.stringify({ error: 'Forbidden' }) }
+  }
+
+  const { data: job, error: jobError } = await supabase
+    .from('albi_jobs')
+    .select('name')
+    .eq('company_id', member.company_id)
+    .eq('name', body.jobName)
+    .maybeSingle()
+
+  if (jobError) {
+    return { statusCode: 500, body: JSON.stringify({ error: jobError.message }) }
+  }
+  if (!job) {
+    return { statusCode: 404, body: JSON.stringify({ error: 'Job not found' }) }
+  }
+
+  let template = null
+  if (body.templateId) {
+    const { data, error } = await supabase
+      .from('letter_templates')
+      .select('id, name, api_slug')
+      .eq('company_id', member.company_id)
+      .eq('id', body.templateId)
+      .maybeSingle()
+
+    if (error) {
+      return { statusCode: 500, body: JSON.stringify({ error: error.message }) }
+    }
+    if (!data) {
+      return { statusCode: 400, body: JSON.stringify({ error: 'Template not found for this company' }) }
+    }
+    template = data
+  }
 
   const { error } = await supabase.from('communication_history').insert({
-    company_id:         body.companyId,
+    company_id:         member.company_id,
     job_name:           body.jobName,
-    template_id:        body.templateId,
-    template_name:      body.templateName,
+    template_id:        template?.id || null,
+    template_name:      template?.name || body.templateName || 'Communication',
+    letter_api_slug:    template?.api_slug || null,
     sent_by:            user.id,
     sent_by_name:       body.sentByName,
     channels:           body.channels,

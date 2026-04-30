@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase.js'
+import { isValidLetterSlug, slugifyLetterType } from '../../lib/templateSlug.js'
 import TemplateEditor from '../TemplateEditor.jsx'
 
 export default function TemplateSettings({ companyId }) {
@@ -21,10 +22,19 @@ export default function TemplateSettings({ companyId }) {
     setSaving(true)
     setSaveError('')
 
+    const rawApiSlug = editing.apiSlugEdited ? editing.api_slug : (editing.api_slug || slugifyLetterType(editing.name))
+    const apiSlug = (rawApiSlug || '').trim()
+    if (!isValidLetterSlug(apiSlug)) {
+      setSaving(false)
+      setSaveError('API Slug must use lowercase letters, numbers, and single hyphens only.')
+      return
+    }
+
     let error
     if (editing.id) {
       ;({ error } = await supabase.from('letter_templates').update({
         name:                editing.name,
+        api_slug:            apiSlug,
         description:         editing.description,
         body:                editing.body,
         is_active:           editing.is_active,
@@ -33,6 +43,7 @@ export default function TemplateSettings({ companyId }) {
     } else {
       ;({ error } = await supabase.from('letter_templates').insert({
         name:                editing.name,
+        api_slug:            apiSlug,
         description:         editing.description,
         body:                editing.body,
         is_active:           editing.is_active,
@@ -54,7 +65,28 @@ export default function TemplateSettings({ companyId }) {
   }
 
   function newTemplate() {
-    setEditing({ name: '', description: '', body: '', requires_due_date: false, is_active: true, sort_order: templates.length })
+    setEditing({
+      name:          '',
+      api_slug:      '',
+      description:   '',
+      body:          '',
+      requires_due_date: false,
+      is_active:     true,
+      sort_order:    templates.length,
+      apiSlugEdited: false,
+    })
+  }
+
+  function handleNameChange(name) {
+    setEditing(t => ({
+      ...t,
+      name,
+      api_slug: !t.id && !t.apiSlugEdited ? slugifyLetterType(name) : t.api_slug,
+    }))
+  }
+
+  function handleSlugChange(apiSlug) {
+    setEditing(t => ({ ...t, api_slug: apiSlug, apiSlugEdited: true }))
   }
 
   async function toggleActive(t) {
@@ -73,7 +105,16 @@ export default function TemplateSettings({ companyId }) {
         <div className="form-row" style={{ marginBottom: 12 }}>
           <div className="form-group" style={{ flex: 2 }}>
             <label>Template Name</label>
-            <input value={editing.name} onChange={e => setEditing(t => ({ ...t, name: e.target.value }))} required />
+            <input value={editing.name} onChange={e => handleNameChange(e.target.value)} required />
+          </div>
+          <div className="form-group" style={{ flex: 1 }}>
+            <label>API Slug</label>
+            <input
+              value={editing.api_slug || ''}
+              onChange={e => handleSlugChange(e.target.value)}
+              placeholder="request-for-payment"
+              required
+            />
           </div>
           <div style={{ display: 'flex', alignItems: 'flex-end', gap: 16 }}>
             <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, cursor: 'pointer', textTransform: 'none', letterSpacing: 'normal' }}>
@@ -123,10 +164,11 @@ export default function TemplateSettings({ companyId }) {
             {t.description && <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>{t.description}</div>}
             <div style={{ display: 'flex', gap: 8, marginTop: 6 }}>
               {t.requires_attachment && <span className="badge badge-pending">requires attachment</span>}
+              {t.api_slug && <span className="badge">{t.api_slug}</span>}
               <span className={`badge ${t.is_active ? 'badge-success' : 'badge-error'}`}>{t.is_active ? 'active' : 'inactive'}</span>
             </div>
           </div>
-          <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => setEditing(t)}>Edit</button>
+          <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => setEditing({ ...t, apiSlugEdited: true })}>Edit</button>
           <button className="btn-secondary" style={{ fontSize: 12 }} onClick={() => toggleActive(t)}>
             {t.is_active ? 'Deactivate' : 'Activate'}
           </button>

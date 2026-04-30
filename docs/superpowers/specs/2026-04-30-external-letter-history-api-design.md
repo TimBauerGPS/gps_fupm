@@ -102,8 +102,7 @@ Response:
   "letterTypes": [
     {
       "slug": "request-for-payment",
-      "label": "Request for Payment",
-      "templateId": "uuid"
+      "label": "Request for Payment"
     }
   ]
 }
@@ -116,7 +115,7 @@ Only active templates for the API key's company are returned.
 Endpoint:
 
 ```http
-GET /api/external/projects/:projectName/letters
+GET /api/external/project-letters?projectName=:projectName
 ```
 
 Response:
@@ -148,7 +147,7 @@ The endpoint should first verify the project exists for the API key's company in
 Endpoint:
 
 ```http
-GET /api/external/projects/:projectName/letters/:letterSlug
+GET /api/external/project-letter-status?projectName=:projectName&letterSlug=:letterSlug
 ```
 
 Response when sent:
@@ -198,7 +197,7 @@ If the project exists for the scoped company but the specific letter has not bee
 Endpoint:
 
 ```http
-GET /api/external/projects/:projectName/link
+GET /api/external/project-link?projectName=:projectName
 ```
 
 Response:
@@ -212,7 +211,7 @@ Response:
 
 This is a deep link into the existing FUPM job page. It is not a public share link and must not bypass FUPM authentication or authorization. A user who opens the link still needs an active FUPM session and access to the company through normal `ProtectedRoute` behavior.
 
-The implementation should build the URL from a configured app base URL and `encodeURIComponent(projectName)`, matching the current frontend route `/jobs/:jobName`.
+The implementation should build the URL from a configured app base URL and `encodeURIComponent(projectName)`, matching the current frontend route `/jobs/:jobName`. External API endpoints should receive `projectName` as a query parameter so project names containing `/` do not break route matching.
 
 The link endpoint should verify that the project exists for the API key's company in `albi_jobs` or has company-scoped `communication_history` before returning a URL. That avoids generating plausible-looking links for projects outside the scoped company.
 
@@ -233,7 +232,7 @@ Add the same slug snapshot to `communication_history`, such as `letter_api_slug`
 Backfill existing history where possible:
 
 - Use the current linked template's slug when `template_id` still points to a template.
-- Fall back to a generated slug from `template_name` when no template row is available.
+- Leave `letter_api_slug` null when no linked template row is available, because rows such as Inbox replies are communication history but not external letter sends.
 
 ## Returned Data Limits
 

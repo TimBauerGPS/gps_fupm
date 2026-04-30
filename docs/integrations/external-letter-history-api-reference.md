@@ -1,6 +1,6 @@
 # FUPM External Letter History API Reference
 
-Status: planned API contract
+Status: implemented
 
 This reference is for an external app that needs to map its letter options to FUPM letter templates, check whether collection letters have been sent for a project, and open the project in FUPM.
 
@@ -77,13 +77,11 @@ Response:
   "letterTypes": [
     {
       "slug": "request-for-payment",
-      "label": "Request for Payment",
-      "templateId": "2b69e3cc-1111-4444-9999-7e8b11a2c123"
+      "label": "Request for Payment"
     },
     {
       "slug": "final-notice",
-      "label": "Final Notice",
-      "templateId": "89f584dd-2222-4444-9999-d14bead20123"
+      "label": "Final Notice"
     }
   ]
 }
@@ -94,14 +92,14 @@ Response:
 Returns a deep link to the FUPM job page for a project.
 
 ```http
-GET /api/external/projects/{projectName}/link
+GET /api/external/project-link?projectName={projectName}
 Authorization: Bearer <FUPM_API_KEY>
 ```
 
 Example:
 
 ```http
-GET /api/external/projects/ARS-12345/link
+GET /api/external/project-link?projectName=ARS-12345
 ```
 
 Response:
@@ -120,14 +118,14 @@ This URL is not a public share link. Opening it requires an active FUPM session 
 Returns collection-letter send history for one project.
 
 ```http
-GET /api/external/projects/{projectName}/letters
+GET /api/external/project-letters?projectName={projectName}
 Authorization: Bearer <FUPM_API_KEY>
 ```
 
 Example:
 
 ```http
-GET /api/external/projects/ARS-12345/letters
+GET /api/external/project-letters?projectName=ARS-12345
 ```
 
 Response:
@@ -167,14 +165,14 @@ If the project exists but no letters have been sent:
 Checks whether the most recent send for a mapped FUPM letter slug exists on a project.
 
 ```http
-GET /api/external/projects/{projectName}/letters/{letterSlug}
+GET /api/external/project-letter-status?projectName={projectName}&letterSlug={letterSlug}
 Authorization: Bearer <FUPM_API_KEY>
 ```
 
 Example:
 
 ```http
-GET /api/external/projects/ARS-12345/letters/request-for-payment
+GET /api/external/project-letter-status?projectName=ARS-12345&letterSlug=request-for-payment
 ```
 
 Response when sent:
@@ -219,7 +217,7 @@ If multiple sends match the same project and letter slug, FUPM returns the most 
 
 ## URL Encoding
 
-Always URL-encode `projectName` and `letterSlug` path values.
+Always URL-encode `projectName` and `letterSlug` query values.
 
 Example:
 
@@ -289,16 +287,16 @@ export async function getFupmLetterTypes() {
 }
 
 export async function getFupmProjectLink(projectName) {
-  return fupmGet(`/api/external/projects/${encodeURIComponent(projectName)}/link`)
+  return fupmGet(`/api/external/project-link?projectName=${encodeURIComponent(projectName)}`)
 }
 
 export async function listFupmProjectLetters(projectName) {
-  return fupmGet(`/api/external/projects/${encodeURIComponent(projectName)}/letters`)
+  return fupmGet(`/api/external/project-letters?projectName=${encodeURIComponent(projectName)}`)
 }
 
 export async function wasFupmLetterSent(projectName, fupmSlug) {
   return fupmGet(
-    `/api/external/projects/${encodeURIComponent(projectName)}/letters/${encodeURIComponent(fupmSlug)}`
+    `/api/external/project-letter-status?projectName=${encodeURIComponent(projectName)}&letterSlug=${encodeURIComponent(fupmSlug)}`
   )
 }
 ```

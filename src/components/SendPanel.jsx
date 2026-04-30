@@ -177,6 +177,7 @@ export default function SendPanel({ job, renderedHtml, template, settings, membe
       jobName:           job.name,
       templateId:        template?.id,
       templateName:      template?.name,
+      letterApiSlug:     template?.api_slug,
       sentByName:        member?.display_name,
       channels,
       amountDue:         balance,
