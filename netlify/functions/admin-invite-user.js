@@ -1,10 +1,11 @@
 import { createClient } from '@supabase/supabase-js'
 import { seedDefaultTemplates } from '../../supabase/seed/default-templates.js'
-import { getAuthEmailConfig, getCompanyAuthEmailOptions, sendAuthEmail } from './_authEmail.js'
+import { getAuthActionLink, getAuthEmailConfig, getCompanyAuthEmailOptions, sendAuthEmail } from './_authEmail.js'
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { autoRefreshToken: false, persistSession: false } },
 )
 
 export const handler = async (event) => {
@@ -72,6 +73,7 @@ export const handler = async (event) => {
 
     const { appName, siteUrl, redirectTo } = getAuthEmailConfig()
 
+    let generatedLinkType = 'invite'
     let inviteResult = await supabase.auth.admin.generateLink({
       type: 'invite',
       email,
@@ -87,6 +89,7 @@ export const handler = async (event) => {
     })
 
     if (inviteResult.error && ['email_exists', 'user_already_exists'].includes(inviteResult.error.code)) {
+      generatedLinkType = 'magiclink'
       inviteResult = await supabase.auth.admin.generateLink({
         type: 'magiclink',
         email,
@@ -99,7 +102,7 @@ export const handler = async (event) => {
     }
 
     const invited = inviteResult.data
-    const actionLink = invited?.properties?.action_link
+    const actionLink = getAuthActionLink({ generatedLinkData: invited, redirectTo, type: generatedLinkType })
     if (!invited?.user?.id || !actionLink) {
       return { statusCode: 500, body: JSON.stringify({ error: 'Invite link could not be generated' }) }
     }

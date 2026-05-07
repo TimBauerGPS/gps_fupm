@@ -1,12 +1,14 @@
 import { useEffect, useState } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { supabase } from './lib/supabase.js'
+import { isAuthTokenUrl } from './lib/authRedirect.js'
 import Nav from './components/Nav.jsx'
 import ProtectedRoute from './components/ProtectedRoute.jsx'
 import AdminRoute from './components/AdminRoute.jsx'
 import Login from './pages/Login.jsx'
 import NoAccess from './pages/NoAccess.jsx'
 import AuthConfirm from './pages/AuthConfirm.jsx'
+import AuthSignIn from './pages/AuthSignIn.jsx'
 import Dashboard from './pages/Dashboard.jsx'
 import JobDetail from './pages/JobDetail.jsx'
 import JobsPendingApproval from './pages/JobsPendingApproval.jsx'
@@ -21,6 +23,11 @@ export default function App() {
   const [session, setSession] = useState(undefined) // undefined = loading
 
   useEffect(() => {
+    if (isAuthTokenUrl(window.location.pathname, window.location.search, window.location.hash)) {
+      setSession(null)
+      return undefined
+    }
+
     supabase.auth.getSession().then(({ data: { session } }) => setSession(session))
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setSession(session)
@@ -42,7 +49,9 @@ export default function App() {
       <Routes>
         <Route path="/login" element={session ? <Navigate to="/dashboard" replace /> : <Login />} />
         <Route path="/no-access" element={<NoAccess />} />
+        <Route path="/auth/sign-in" element={<AuthSignIn />} />
         <Route path="/auth/confirm" element={<AuthConfirm />} />
+        <Route path="/auth/callback" element={<AuthConfirm />} />
 
         <Route element={<ProtectedRoute session={session} />}>
           <Route path="/" element={<Navigate to="/dashboard" replace />} />

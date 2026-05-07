@@ -1,9 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
-import { getAuthEmailConfig, getCompanyAuthEmailOptions, sendAuthEmail } from './_authEmail.js'
+import { getAuthActionLink, getAuthEmailConfig, getCompanyAuthEmailOptions, sendAuthEmail } from './_authEmail.js'
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
-  process.env.SUPABASE_SERVICE_ROLE_KEY
+  process.env.SUPABASE_SERVICE_ROLE_KEY,
+  { auth: { autoRefreshToken: false, persistSession: false } },
 )
 
 export const handler = async (event) => {
@@ -34,7 +35,7 @@ export const handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: error.message }) }
     }
 
-    const actionLink = data?.properties?.action_link
+    const actionLink = getAuthActionLink({ generatedLinkData: data, redirectTo, type: 'magiclink' })
     if (!actionLink) {
       throw new Error('Magic link could not be generated')
     }

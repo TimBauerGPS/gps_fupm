@@ -1,4 +1,5 @@
 import { Resend } from 'resend'
+import { buildAuthSignInUrl, getScannerSafeActionLink } from '../../src/lib/authRedirect.js'
 
 function escapeHtml(value) {
   return value
@@ -26,9 +27,17 @@ export function getAuthEmailConfig(overrides = {}) {
   return {
     appName,
     siteUrl,
-    redirectTo: `${siteUrl}/dashboard`,
+    redirectTo: buildAuthSignInUrl(siteUrl, '/dashboard'),
     fromEmail,
   }
+}
+
+export function getAuthActionLink({ generatedLinkData, redirectTo, type }) {
+  return getScannerSafeActionLink({
+    redirectTo,
+    type,
+    properties: generatedLinkData?.properties || {},
+  })
 }
 
 export async function getCompanyAuthEmailOptions(supabase, companyId) {

@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { supabase } from '../lib/supabase.js'
+import { buildAuthSignInUrl } from '../lib/authRedirect.js'
 
 export default function Login() {
   const [email, setEmail] = useState('')
@@ -11,24 +12,29 @@ export default function Login() {
     e.preventDefault()
     setLoading(true)
     setError('')
-    const res = await fetch('/api/send-magic-link', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email }),
-    })
-    const data = await res.json()
-    setLoading(false)
-    if (!res.ok) {
-      setError(data.error || 'Unable to send magic link')
-    } else {
-      setSent(true)
+    try {
+      const res = await fetch('/api/send-magic-link', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setError(data.error || 'Unable to send magic link')
+      } else {
+        setSent(true)
+      }
+    } catch {
+      setError('Unable to send magic link. Please check your connection and try again.')
+    } finally {
+      setLoading(false)
     }
   }
 
   async function handleGoogle() {
     await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: window.location.origin + '/dashboard' },
+      options: { redirectTo: buildAuthSignInUrl(window.location.origin, '/dashboard') },
     })
   }
 
