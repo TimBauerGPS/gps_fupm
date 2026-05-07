@@ -52,6 +52,12 @@
   to = "/.netlify/functions/short-link?slug=:slug"
   status = 200
 
+[[redirects]]
+  from = "https://fupm.netlify.app/*"
+  to = "https://restopay.xyz/:splat"
+  status = 301
+  force = true
+
 # SPA fallback — must come after all API/function routes
 [[redirects]]
   from = "/*"
